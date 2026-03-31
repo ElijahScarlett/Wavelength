@@ -17,5 +17,11 @@
   "bugs": {
     "url": "https://github.com/ElijahScarlett/Wavelength/issues"
   },
-  "homepage": "https://github.com/ElijahScarlett/Wavelength#readme"
+  "homepage": "https://github.com/ElijahScarlett/Wavelength#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1"
+  }
 }
