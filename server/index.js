@@ -1,10 +1,12 @@
 // server/index.js
 // Wavelength backend server
-// Handles room creation and queue management
+// Handles room creation, queue management, and real-time sync
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
 const { createClient } = require('@supabase/supabase-js');
 
 // Connect to Supabase using keys from .env
@@ -14,6 +16,9 @@ const supabase = createClient(
 );
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: '*' } });
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
@@ -26,10 +31,7 @@ app.get('/health', (req, res) => {
 // POST /room - create a new room
 app.post('/room', async (req, res) => {
   const { name } = req.body;
-
-  if (!name) {
-    return res.status(400).json({ error: 'Room name is required' });
-  }
+  if (!name) return res.status(400).json({ error: 'Room name is required' });
 
   const { data, error } = await supabase
     .from('rooms')
@@ -38,7 +40,6 @@ app.post('/room', async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
-
   res.json({ room: data });
 });
 
@@ -82,11 +83,30 @@ app.post('/room/:id/queue', async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
 
+  // Broadcast to everyone in this room that the queue changed
+  io.to(id).emit('queue:updated', { item: data });
+
   res.json({ item: data });
+});
+
+// WebSocket connection handling
+io.on('connection', (socket) => {
+  console.log('A user connected:', socket.id);
+
+  // When a user joins a room, add them to that room's channel
+  socket.on('room:join', (roomId) => {
+    socket.join(roomId);
+    console.log(`User ${socket.id} joined room ${roomId}`);
+  });
+
+  // When a user disconnects
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
 });
 
 // Start the server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Wavelength server running on http://localhost:${PORT}`);
 });
