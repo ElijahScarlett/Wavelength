@@ -1,6 +1,6 @@
 // server/index.js
 // Wavelength backend server
-// Handles room creation, queue management, and real-time sync
+// Handles rooms, queue, real-time sync, and Spotify OAuth
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const express = require('express');
@@ -9,11 +9,14 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { createClient } = require('@supabase/supabase-js');
 
-// Connect to Supabase using keys from .env
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SECRET_KEY
 );
+
+const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
+const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 
 const app = express();
 const server = http.createServer(app);
@@ -23,12 +26,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// GET /health - check the server is running
+// GET /health
 app.get('/health', (req, res) => {
   res.json({ status: 'Wavelength server is running' });
 });
 
-// POST /room - create a new room
+// POST /room - create a room
 app.post('/room', async (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: 'Room name is required' });
@@ -43,7 +46,7 @@ app.post('/room', async (req, res) => {
   res.json({ room: data });
 });
 
-// GET /room/:id - get a room and its queue
+// GET /room/:id - get room + queue
 app.get('/room/:id', async (req, res) => {
   const { id } = req.params;
 
@@ -66,7 +69,7 @@ app.get('/room/:id', async (req, res) => {
   res.json({ room, queue });
 });
 
-// POST /room/:id/queue - add a song to the queue
+// POST /room/:id/queue - add a song
 app.post('/room/:id/queue', async (req, res) => {
   const { id } = req.params;
   const { track_name, artist_name, added_by } = req.body;
@@ -83,29 +86,92 @@ app.post('/room/:id/queue', async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
 
-  // Broadcast to everyone in this room that the queue changed
   io.to(id).emit('queue:updated', { item: data });
-
   res.json({ item: data });
 });
 
-// WebSocket connection handling
+// GET /auth/spotify - redirect to Spotify login
+app.get('/auth/spotify', (req, res) => {
+  const scope = 'streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state';
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: SPOTIFY_CLIENT_ID,
+    scope,
+    redirect_uri: SPOTIFY_REDIRECT_URI,
+  });
+  res.redirect(`https://accounts.spotify.com/authorize?${params}`);
+});
+
+// GET /callback - Spotify sends user back here
+app.get('/callback', async (req, res) => {
+  const code = req.query.code;
+  if (!code) return res.status(400).send('No code provided');
+
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: SPOTIFY_REDIRECT_URI,
+  });
+
+  const response = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
+    },
+    body,
+  });
+
+  const data = await response.json();
+  if (data.error) return res.status(400).json({ error: data.error });
+
+  res.send(`
+    <script>
+      window.opener.postMessage({ 
+        type: 'spotify-auth', 
+        access_token: '${data.access_token}' 
+      }, '*');
+      window.close();
+    </script>
+  `);
+});
+
+// POST /spotify/play - play a track on user's Spotify
+app.post('/spotify/play', async (req, res) => {
+  const { access_token, track_uri } = req.body;
+
+  const response = await fetch('https://api.spotify.com/v1/me/player/play', {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ uris: [track_uri] }),
+  });
+
+  if (response.status === 204) {
+    res.json({ success: true });
+  } else {
+    const error = await response.json();
+    res.status(400).json({ error });
+  }
+});
+
+// WebSocket connection
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
-  // When a user joins a room, add them to that room's channel
   socket.on('room:join', (roomId) => {
     socket.join(roomId);
     console.log(`User ${socket.id} joined room ${roomId}`);
   });
 
-  // When a user disconnects
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
 });
 
-// Start the server
+// Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Wavelength server running on http://localhost:${PORT}`);
