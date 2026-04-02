@@ -146,7 +146,7 @@ app.post('/spotify/play', async (req, res) => {
       'Authorization': `Bearer ${access_token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ uris: [track_uri] }),
+    body: JSON.stringify({ uris: [track_uri], device_id: req.body.device_id }),
   });
 
   if (response.status === 204) {
