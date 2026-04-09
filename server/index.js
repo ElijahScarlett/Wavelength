@@ -26,6 +26,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// Room page route — serves index.html for any /room/:id URL
+app.get('/room/:id', (req, res) => {
+  res.sendFile(require('path').resolve(__dirname, '../public/index.html'));
+});
+
 // GET /health
 app.get('/health', (req, res) => {
   res.json({ status: 'Wavelength server is running' });
@@ -46,8 +51,8 @@ app.post('/room', async (req, res) => {
   res.json({ room: data });
 });
 
-// GET /room/:id - get room + queue
-app.get('/room/:id', async (req, res) => {
+// GET /api/room/:id - get room + queue
+app.get('/api/room/:id', async (req, res) => {
   const { id } = req.params;
 
   const { data: room, error: roomError } = await supabase
