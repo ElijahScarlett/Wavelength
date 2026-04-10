@@ -167,7 +167,28 @@ app.post('/spotify/play', async (req, res) => {
     res.status(400).json({ error });
   }
 });
+// GET /spotify/search - search for tracks
+app.get('/spotify/search', async (req, res) => {
+  const { query, access_token } = req.query;
+  if (!query || !access_token) return res.status(400).json({ error: 'Missing query or token' });
 
+  const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=5`, {
+    headers: { 'Authorization': `Bearer ${access_token}` }
+  });
+
+  const data = await response.json();
+  if (data.error) return res.status(400).json({ error: data.error });
+
+  const tracks = data.tracks.items.map(t => ({
+    uri: t.uri,
+    name: t.name,
+    artist: t.artists[0].name,
+    album: t.album.name,
+    image: t.album.images[1]?.url
+  }));
+
+  res.json({ tracks });
+});
 // WebSocket connection
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
