@@ -25,10 +25,13 @@ const io = new Server(server, { cors: { origin: '*' } });
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
-
+// Home page route
+app.get('/', (req, res) => {
+  res.sendFile(require('path').resolve(__dirname, '../public/home.html'));
+});
 // Room page route — serves index.html for any /room/:id URL
 app.get('/room/:id', (req, res) => {
-  res.sendFile(require('path').resolve(__dirname, '../public/index.html'));
+  res.sendFile(require('path').resolve(__dirname, '../public/room.html'));
 });
 
 // GET /health
