@@ -50,7 +50,10 @@ app.post('/room', async (req, res) => {
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    console.error('Supabase error:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
   res.json({ room: data });
 });
 
