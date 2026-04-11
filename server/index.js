@@ -195,15 +195,30 @@ app.get('/spotify/search', async (req, res) => {
 });
 
 // WebSocket connection
+const roomMembers = {};
+
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
   socket.on('room:join', (roomId) => {
     socket.join(roomId);
+    socket.roomId = roomId;
     console.log(`User ${socket.id} joined room ${roomId}`);
   });
 
+  socket.on('member:join', ({ roomId, name }) => {
+    if (!roomMembers[roomId]) roomMembers[roomId] = {};
+    roomMembers[roomId][socket.id] = { name };
+    socket.roomId = roomId;
+    io.to(roomId).emit('member:update', roomMembers[roomId]);
+  });
+
   socket.on('disconnect', () => {
+    const roomId = socket.roomId;
+    if (roomId && roomMembers[roomId]) {
+      delete roomMembers[roomId][socket.id];
+      io.to(roomId).emit('member:update', roomMembers[roomId]);
+    }
     console.log('User disconnected:', socket.id);
   });
 });
