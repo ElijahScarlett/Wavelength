@@ -184,7 +184,8 @@ app.get('/spotify/search', async (req, res) => {
     name: t.name,
     artist: t.artists[0].name,
     album: t.album.name,
-    image: t.album.images[1]?.url
+    image: t.album.images[1]?.url,
+    duration: Math.round(t.duration_ms / 1000)
   }));
 
   res.json({ tracks });
