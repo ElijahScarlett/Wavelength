@@ -83,7 +83,7 @@ app.get('/api/room/:id', async (req, res) => {
 // POST /room/:id/queue - add a song
 app.post('/room/:id/queue', async (req, res) => {
   const { id } = req.params;
-  const { track_name, artist_name, added_by } = req.body;
+const { track_name, artist_name, added_by, image_url } = req.body;
 
   if (!track_name || !artist_name) {
     return res.status(400).json({ error: 'track_name and artist_name are required' });
@@ -91,7 +91,7 @@ app.post('/room/:id/queue', async (req, res) => {
 
   const { data, error } = await supabase
     .from('queue_items')
-    .insert({ room_id: id, track_name, artist_name, added_by })
+   .insert({ room_id: id, track_name, artist_name, added_by, image_url })
     .select()
     .single();
 
