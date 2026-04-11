@@ -25,11 +25,13 @@ const io = new Server(server, { cors: { origin: '*' } });
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
 // Home page route
 app.get('/', (req, res) => {
   res.sendFile(require('path').resolve(__dirname, '../public/home.html'));
 });
-// Room page route — serves index.html for any /room/:id URL
+
+// Room page route
 app.get('/room/:id', (req, res) => {
   res.sendFile(require('path').resolve(__dirname, '../public/room.html'));
 });
@@ -83,7 +85,7 @@ app.get('/api/room/:id', async (req, res) => {
 // POST /room/:id/queue - add a song
 app.post('/room/:id/queue', async (req, res) => {
   const { id } = req.params;
-const { track_name, artist_name, added_by, image_url } = req.body;
+  const { track_name, artist_name, added_by, image_url, spotify_uri } = req.body;
 
   if (!track_name || !artist_name) {
     return res.status(400).json({ error: 'track_name and artist_name are required' });
@@ -91,7 +93,7 @@ const { track_name, artist_name, added_by, image_url } = req.body;
 
   const { data, error } = await supabase
     .from('queue_items')
-   .insert({ room_id: id, track_name, artist_name, added_by, image_url })
+    .insert({ room_id: id, track_name, artist_name, added_by, image_url, spotify_uri })
     .select()
     .single();
 
@@ -167,6 +169,7 @@ app.post('/spotify/play', async (req, res) => {
     res.status(400).json({ error });
   }
 });
+
 // GET /spotify/search - search for tracks
 app.get('/spotify/search', async (req, res) => {
   const { query, access_token } = req.query;
@@ -190,6 +193,7 @@ app.get('/spotify/search', async (req, res) => {
 
   res.json({ tracks });
 });
+
 // WebSocket connection
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
