@@ -5,113 +5,217 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wavelength</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      background: linear-gradient(135deg, #0d0d2b 0%, #1a0a3c 50%, #0d1a3c 100%);
-      color: #ffffff;
+      background: #0a0a1e;
+      color: #fff;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Ambient orbs */
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+    }
+    .orb-1 {
+      width: 400px; height: 400px;
+      background: rgba(29,185,84,0.08);
+      top: -100px; left: -100px;
+    }
+    .orb-2 {
+      width: 500px; height: 500px;
+      background: rgba(100,50,200,0.08);
+      bottom: -150px; right: -150px;
+    }
+    .orb-3 {
+      width: 300px; height: 300px;
+      background: rgba(29,185,84,0.05);
+      bottom: 100px; left: 50%;
+      transform: translateX(-50%);
+    }
+
+    /* Diamond progress decoration */
+    .diamonds-deco {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 32px;
+      position: relative;
+    }
+    .diamonds-deco::before, .diamonds-deco::after {
+      content: '';
+      height: 1px;
+      width: 40px;
+      background: linear-gradient(90deg, transparent, rgba(29,185,84,0.3));
+    }
+    .diamonds-deco::after {
+      background: linear-gradient(90deg, rgba(29,185,84,0.3), transparent);
+    }
+    .deco-diamond {
+      width: 8px; height: 8px;
+      transform: rotate(45deg);
+      border: 1px solid rgba(29,185,84,0.4);
+      background: transparent;
+    }
+    .deco-diamond.lit {
+      background: #1db954;
+      border-color: #1db954;
+      box-shadow: 0 0 8px rgba(29,185,84,0.6);
     }
 
     .container {
       text-align: center;
       width: 100%;
-      max-width: 400px;
+      max-width: 380px;
       padding: 0 24px;
+      position: relative;
+      z-index: 1;
     }
 
-    .logo {
-      font-size: 36px;
-      font-weight: 800;
-      letter-spacing: 0.05em;
+    .wordmark {
+      font-size: 11px;
+      letter-spacing: 0.28em;
       text-transform: uppercase;
-      margin-bottom: 8px;
+      color: #1db954;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .headline {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #fff 60%, rgba(255,255,255,0.5));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
     .tagline {
       font-size: 14px;
-      color: rgba(255,255,255,0.4);
-      margin-bottom: 48px;
-      letter-spacing: 0.05em;
+      color: rgba(255,255,255,0.35);
+      margin-bottom: 40px;
+      line-height: 1.5;
+      letter-spacing: 0.01em;
+    }
+
+    .input-wrap {
+      position: relative;
+      margin-bottom: 10px;
     }
 
     .input {
       width: 100%;
-      background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
       padding: 16px 20px;
       color: #fff;
-      font-size: 16px;
+      font-size: 15px;
       outline: none;
-      margin-bottom: 12px;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, background 0.2s;
+      font-family: inherit;
     }
 
     .input:focus {
       border-color: rgba(29,185,84,0.5);
+      background: rgba(255,255,255,0.07);
     }
 
-    .input::placeholder {
-      color: rgba(255,255,255,0.25);
-    }
+    .input::placeholder { color: rgba(255,255,255,0.2); }
 
     .btn {
       width: 100%;
       background: #1db954;
       color: #000;
       border: none;
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 16px;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
       cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-      box-shadow: 0 4px 20px rgba(29,185,84,0.3);
+      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+      box-shadow: 0 4px 24px rgba(29,185,84,0.25);
+      font-family: inherit;
+      letter-spacing: 0.01em;
     }
 
     .btn:hover {
       background: #21d45f;
-      transform: scale(1.02);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(29,185,84,0.35);
     }
 
+    .btn:active { transform: translateY(0); }
+
     .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
+      opacity: 0.5; cursor: not-allowed;
+      transform: none; box-shadow: none;
     }
 
     .error {
-      color: #ff4444;
-      font-size: 13px;
-      margin-top: 8px;
+      color: rgba(255,80,80,0.8);
+      font-size: 12px;
+      margin-top: 10px;
       display: none;
     }
+
+    .footer-note {
+      margin-top: 28px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.18);
+      letter-spacing: 0.02em;
+    }
+    .footer-note span { color: rgba(29,185,84,0.5); }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="logo">Wavelength</div>
-    <div class="tagline">A room for you and your friends</div>
 
-    <input
-      class="input"
-      id="room-name"
-      type="text"
-      placeholder="Name your room..."
-      maxlength="40"
-    />
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="container">
+
+    <div class="diamonds-deco">
+      <div class="deco-diamond lit"></div>
+      <div class="deco-diamond lit"></div>
+      <div class="deco-diamond lit"></div>
+      <div class="deco-diamond"></div>
+      <div class="deco-diamond"></div>
+    </div>
+
+    <div class="wordmark">Wavelength</div>
+    <div class="headline">Your room.<br>Your music.</div>
+    <div class="tagline">Create a shared listening room and invite your friends. Everyone hears the same song, at the same time.</div>
+
+    <div class="input-wrap">
+      <input
+        class="input"
+        id="room-name"
+        type="text"
+        placeholder="Name your room..."
+        maxlength="40"
+        autocomplete="off"
+      />
+    </div>
     <button class="btn" id="create-btn" onclick="createRoom()">Create Room</button>
     <div class="error" id="error">Something went wrong. Try again.</div>
+
+    <div class="footer-note">Requires <span>Spotify Premium</span> for playback</div>
+
   </div>
 
   <script>
@@ -120,39 +224,28 @@
       const btn = document.getElementById('create-btn');
       const error = document.getElementById('error');
       const name = input.value.trim();
-
-      if (!name) {
-        input.focus();
-        return;
-      }
-
+      if (!name) { input.focus(); return; }
       btn.disabled = true;
       btn.textContent = 'Creating...';
       error.style.display = 'none';
-
       try {
         const res = await fetch('/room', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name })
         });
-
         const data = await res.json();
-
         if (data.room) {
           window.location.href = `/room/${data.room.id}`;
-        } else {
-          throw new Error('No room returned');
-        }
-      } catch (err) {
+        } else { throw new Error(); }
+      } catch {
         error.style.display = 'block';
         btn.disabled = false;
         btn.textContent = 'Create Room';
       }
     }
 
-    // Allow pressing Enter to create room
-    document.getElementById('room-name').addEventListener('keydown', (e) => {
+    document.getElementById('room-name').addEventListener('keydown', e => {
       if (e.key === 'Enter') createRoom();
     });
   </script>
