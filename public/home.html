@@ -4,204 +4,337 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wavelength</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --green: #1db954;
+      --green-dim: rgba(29,185,84,0.15);
+      --bg: #080810;
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    body {
-      background: #0a0a1e;
+    html, body {
+      height: 100%;
+      background: var(--bg);
       color: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      min-height: 100vh;
+      font-family: 'DM Sans', sans-serif;
+      overflow: hidden;
+    }
+
+    /* Full-screen layout */
+    .layout {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      position: relative;
+    }
+
+    /* Left panel */
+    .left {
       display: flex;
       flex-direction: column;
-      align-items: center;
       justify-content: center;
-      overflow: hidden;
+      padding: 60px 56px 60px 64px;
       position: relative;
-    }
-
-    /* Ambient orbs */
-    .orb {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(80px);
-      pointer-events: none;
-    }
-    .orb-1 {
-      width: 400px; height: 400px;
-      background: rgba(29,185,84,0.08);
-      top: -100px; left: -100px;
-    }
-    .orb-2 {
-      width: 500px; height: 500px;
-      background: rgba(100,50,200,0.08);
-      bottom: -150px; right: -150px;
-    }
-    .orb-3 {
-      width: 300px; height: 300px;
-      background: rgba(29,185,84,0.05);
-      bottom: 100px; left: 50%;
-      transform: translateX(-50%);
-    }
-
-    /* Diamond progress decoration */
-    .diamonds-deco {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 32px;
-      position: relative;
-    }
-    .diamonds-deco::before, .diamonds-deco::after {
-      content: '';
-      height: 1px;
-      width: 40px;
-      background: linear-gradient(90deg, transparent, rgba(29,185,84,0.3));
-    }
-    .diamonds-deco::after {
-      background: linear-gradient(90deg, rgba(29,185,84,0.3), transparent);
-    }
-    .deco-diamond {
-      width: 8px; height: 8px;
-      transform: rotate(45deg);
-      border: 1px solid rgba(29,185,84,0.4);
-      background: transparent;
-    }
-    .deco-diamond.lit {
-      background: #1db954;
-      border-color: #1db954;
-      box-shadow: 0 0 8px rgba(29,185,84,0.6);
-    }
-
-    .container {
-      text-align: center;
-      width: 100%;
-      max-width: 380px;
-      padding: 0 24px;
-      position: relative;
-      z-index: 1;
+      z-index: 2;
     }
 
     .wordmark {
-      font-size: 11px;
-      letter-spacing: 0.28em;
+      font-family: 'Syne', sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.4em;
       text-transform: uppercase;
-      color: #1db954;
-      font-weight: 700;
-      margin-bottom: 16px;
+      color: var(--green);
+      margin-bottom: 48px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .wordmark::before {
+      content: '';
+      display: inline-block;
+      width: 6px; height: 6px;
+      background: var(--green);
+      transform: rotate(45deg);
+      flex-shrink: 0;
     }
 
     .headline {
-      font-size: 38px;
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(44px, 5.5vw, 72px);
       font-weight: 800;
-      letter-spacing: -0.02em;
-      line-height: 1.05;
-      margin-bottom: 12px;
-      background: linear-gradient(135deg, #fff 60%, rgba(255,255,255,0.5));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      line-height: 1.0;
+      letter-spacing: -0.03em;
+      margin-bottom: 24px;
+      color: #fff;
+    }
+    .headline .accent {
+      display: block;
+      color: transparent;
+      -webkit-text-stroke: 1.5px rgba(255,255,255,0.35);
+    }
+    .headline .lit {
+      display: block;
+      color: #fff;
     }
 
-    .tagline {
+    .sub {
       font-size: 14px;
-      color: rgba(255,255,255,0.35);
-      margin-bottom: 40px;
-      line-height: 1.5;
+      color: rgba(255,255,255,0.32);
+      line-height: 1.65;
+      max-width: 320px;
+      margin-bottom: 48px;
       letter-spacing: 0.01em;
     }
 
-    .input-wrap {
-      position: relative;
-      margin-bottom: 10px;
-    }
+    /* Form */
+    .form { display: flex; flex-direction: column; gap: 10px; max-width: 340px; }
 
+    .input-wrap { position: relative; }
     .input {
       width: 100%;
       background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 14px;
-      padding: 16px 20px;
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 12px;
+      padding: 15px 20px;
       color: #fff;
-      font-size: 15px;
+      font-size: 14px;
+      font-family: 'DM Sans', sans-serif;
       outline: none;
       transition: border-color 0.2s, background 0.2s;
-      font-family: inherit;
+      letter-spacing: 0.01em;
     }
-
     .input:focus {
-      border-color: rgba(29,185,84,0.5);
+      border-color: rgba(29,185,84,0.45);
       background: rgba(255,255,255,0.07);
     }
-
     .input::placeholder { color: rgba(255,255,255,0.2); }
 
     .btn {
-      width: 100%;
-      background: #1db954;
+      background: var(--green);
       color: #000;
       border: none;
-      border-radius: 14px;
-      padding: 16px;
-      font-size: 15px;
+      border-radius: 12px;
+      padding: 15px 28px;
+      font-size: 14px;
       font-weight: 700;
+      font-family: 'DM Sans', sans-serif;
       cursor: pointer;
+      letter-spacing: 0.04em;
       transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-      box-shadow: 0 4px 24px rgba(29,185,84,0.25);
-      font-family: inherit;
-      letter-spacing: 0.01em;
+      box-shadow: 0 4px 28px rgba(29,185,84,0.28);
+      text-transform: uppercase;
     }
-
     .btn:hover {
-      background: #21d45f;
+      background: #22e060;
       transform: translateY(-1px);
-      box-shadow: 0 6px 28px rgba(29,185,84,0.35);
+      box-shadow: 0 6px 36px rgba(29,185,84,0.4);
     }
-
     .btn:active { transform: translateY(0); }
-
-    .btn:disabled {
-      opacity: 0.5; cursor: not-allowed;
-      transform: none; box-shadow: none;
-    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
 
     .error {
-      color: rgba(255,80,80,0.8);
       font-size: 12px;
-      margin-top: 10px;
+      color: rgba(255,80,80,0.75);
       display: none;
+      padding: 0 4px;
     }
 
-    .footer-note {
+    .footnote {
       margin-top: 28px;
       font-size: 11px;
-      color: rgba(255,255,255,0.18);
-      letter-spacing: 0.02em;
+      color: rgba(255,255,255,0.15);
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    .footer-note span { color: rgba(29,185,84,0.5); }
+    .footnote span { color: rgba(29,185,84,0.45); }
+
+    /* Right panel — visual */
+    .right {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Vertical divider */
+    .right::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 15%; bottom: 15%;
+      width: 1px;
+      background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.06) 30%, rgba(255,255,255,0.06) 70%, transparent);
+      z-index: 3;
+    }
+
+    /* Big ambient glow */
+    .glow-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      pointer-events: none;
+    }
+    .orb-a {
+      width: 55vw; height: 55vw;
+      background: radial-gradient(circle, rgba(29,185,84,0.07) 0%, transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .orb-b {
+      width: 30vw; height: 30vw;
+      background: rgba(100,60,200,0.08);
+      bottom: -5%; right: -5%;
+    }
+    .orb-c {
+      width: 20vw; height: 20vw;
+      background: rgba(29,185,84,0.06);
+      top: 10%; left: 10%;
+    }
+
+    /* Floating room preview card */
+    .preview-card {
+      position: relative;
+      z-index: 2;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 20px;
+      width: 280px;
+      backdrop-filter: blur(20px);
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .card-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .card-room-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+    }
+    .card-live {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 10px; color: var(--green); font-weight: 600;
+    }
+    .live-dot {
+      width: 5px; height: 5px; border-radius: 50%; background: var(--green);
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .card-now-playing {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+    }
+    .card-album {
+      width: 46px; height: 46px; border-radius: 8px;
+      background: linear-gradient(135deg, #1a3a2a, #0d2b1f);
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; overflow: hidden;
+    }
+    .card-album::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(29,185,84,0.3), transparent);
+    }
+    .card-track { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+    .card-artist { font-size: 11px; color: rgba(255,255,255,0.35); }
+
+    /* Mini diamond bar */
+    .mini-bar {
+      display: flex; align-items: center; gap: 5px; margin-bottom: 14px;
+    }
+    .mini-line { flex: 1; height: 1px; background: rgba(255,255,255,0.07); position: relative; overflow: visible; }
+    .mini-line-fill {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      background: var(--green); border-radius: 1px;
+      animation: progress 8s linear infinite;
+    }
+    @keyframes progress { 0% { width: 0%; } 100% { width: 100%; } }
+    .mini-diamond {
+      width: 7px; height: 7px; border: 1px solid rgba(29,185,84,0.4);
+      transform: rotate(45deg); background: transparent; flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .mini-diamond.on { background: var(--green); border-color: var(--green); box-shadow: 0 0 5px rgba(29,185,84,0.6); }
+
+    /* Member pills */
+    .card-members {
+      display: flex; align-items: center; gap: 5px;
+    }
+    .m-pill {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 8px; font-weight: 700; color: rgba(255,255,255,0.6);
+      font-family: 'Syne', sans-serif;
+    }
+    .m-pill.you { background: var(--green); border-color: var(--green); color: #000; }
+    .m-count { font-size: 10px; color: rgba(255,255,255,0.25); margin-left: 4px; }
+
+    /* Queue preview below card */
+    .queue-preview {
+      position: relative; z-index: 2;
+      margin-top: 12px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .qp-item {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 10px;
+      padding: 9px 14px;
+      display: flex; align-items: center; gap: 8px;
+      width: 240px;
+    }
+    .qp-item:nth-child(1) { opacity: 0.7; width: 260px; }
+    .qp-item:nth-child(2) { opacity: 0.4; width: 220px; }
+    .qp-num { font-size: 9px; color: rgba(255,255,255,0.2); width: 12px; font-variant-numeric: tabular-nums; }
+    .qp-dot { width: 20px; height: 20px; border-radius: 4px; background: rgba(255,255,255,0.07); flex-shrink: 0; }
+    .qp-track { font-size: 11px; color: rgba(255,255,255,0.5); }
+
+    /* Noise grain overlay */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 100;
+      opacity: 0.35;
+    }
   </style>
 </head>
 <body>
 
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
+<div class="layout">
 
-  <div class="container">
+  <!-- LEFT -->
+  <div class="left">
+    <div class="wordmark">Wavelength</div>
 
-    <div class="diamonds-deco">
-      <div class="deco-diamond lit"></div>
-      <div class="deco-diamond lit"></div>
-      <div class="deco-diamond lit"></div>
-      <div class="deco-diamond"></div>
-      <div class="deco-diamond"></div>
+    <div class="headline">
+      <span class="accent">Same song.</span>
+      <span class="lit">Same moment.</span>
+      <span class="lit">Anywhere.</span>
     </div>
 
-    <div class="wordmark">Wavelength</div>
-    <div class="headline">Your room.<br>Your music.</div>
-    <div class="tagline">Create a shared listening room and invite your friends. Everyone hears the same song, at the same time.</div>
+    <p class="sub">
+      Create a room. Drop a song. Everyone hears it at the exact same time — whether they're across the hall or across the country.
+    </p>
 
-    <div class="input-wrap">
+    <div class="form">
       <input
         class="input"
         id="room-name"
@@ -210,44 +343,114 @@
         maxlength="40"
         autocomplete="off"
       />
+      <button class="btn" id="create-btn" onclick="createRoom()">Create Room</button>
+      <div class="error" id="error">Something went wrong. Try again.</div>
     </div>
-    <button class="btn" id="create-btn" onclick="createRoom()">Create Room</button>
-    <div class="error" id="error">Something went wrong. Try again.</div>
 
-    <div class="footer-note">Requires <span>Spotify Premium</span> for playback</div>
-
+    <div class="footnote">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+        <path d="M9 18V5l12-2v13" stroke="rgba(29,185,84,0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="6" cy="18" r="3" stroke="rgba(29,185,84,0.5)" stroke-width="2"/>
+        <circle cx="18" cy="16" r="3" stroke="rgba(29,185,84,0.5)" stroke-width="2"/>
+      </svg>
+      Requires <span>Spotify Premium</span> for playback
+    </div>
   </div>
 
-  <script>
-    async function createRoom() {
-      const input = document.getElementById('room-name');
-      const btn = document.getElementById('create-btn');
-      const error = document.getElementById('error');
-      const name = input.value.trim();
-      if (!name) { input.focus(); return; }
-      btn.disabled = true;
-      btn.textContent = 'Creating...';
-      error.style.display = 'none';
-      try {
-        const res = await fetch('/room', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name })
-        });
-        const data = await res.json();
-        if (data.room) {
-          window.location.href = `/room/${data.room.id}`;
-        } else { throw new Error(); }
-      } catch {
-        error.style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = 'Create Room';
-      }
-    }
+  <!-- RIGHT -->
+  <div class="right">
+    <div class="glow-orb orb-a"></div>
+    <div class="glow-orb orb-b"></div>
+    <div class="glow-orb orb-c"></div>
 
-    document.getElementById('room-name').addEventListener('keydown', e => {
-      if (e.key === 'Enter') createRoom();
-    });
-  </script>
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <!-- Main card -->
+      <div class="preview-card">
+        <div class="card-top">
+          <div class="card-room-name">friday vibes</div>
+          <div class="card-live"><div class="live-dot"></div> live</div>
+        </div>
+        <div class="card-now-playing">
+          <div class="card-album">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="position:relative;z-index:1;">
+              <path d="M9 18V5l12-2v13" stroke="rgba(29,185,84,0.7)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="6" cy="18" r="3" stroke="rgba(29,185,84,0.7)" stroke-width="2"/>
+              <circle cx="18" cy="16" r="3" stroke="rgba(29,185,84,0.7)" stroke-width="2"/>
+            </svg>
+          </div>
+          <div>
+            <div class="card-track">God Did</div>
+            <div class="card-artist">DJ Khaled</div>
+          </div>
+        </div>
+        <div class="mini-bar">
+          <div class="mini-diamond on"></div>
+          <div class="mini-line"><div class="mini-line-fill"></div></div>
+          <div class="mini-diamond on"></div>
+          <div class="mini-line"><div class="mini-line-fill" style="animation-delay:-2s"></div></div>
+          <div class="mini-diamond on"></div>
+          <div class="mini-line"></div>
+          <div class="mini-diamond"></div>
+          <div class="mini-line"></div>
+          <div class="mini-diamond"></div>
+        </div>
+        <div class="card-members">
+          <div class="m-pill you">E</div>
+          <div class="m-pill">J</div>
+          <div class="m-pill">M</div>
+          <div class="m-pill">K</div>
+          <div class="m-count">+2 more</div>
+        </div>
+      </div>
+
+      <!-- Queue ghost items -->
+      <div class="queue-preview">
+        <div class="qp-item">
+          <div class="qp-num">1</div>
+          <div class="qp-dot"></div>
+          <div class="qp-track">HUMBLE. — Kendrick Lamar</div>
+        </div>
+        <div class="qp-item">
+          <div class="qp-num">2</div>
+          <div class="qp-dot"></div>
+          <div class="qp-track">Lottery — K Camp</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  async function createRoom() {
+    const input = document.getElementById('room-name');
+    const btn = document.getElementById('create-btn');
+    const error = document.getElementById('error');
+    const name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+    error.style.display = 'none';
+    try {
+      const res = await fetch('/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const data = await res.json();
+      if (data.room) {
+        window.location.href = `/room/${data.room.id}`;
+      } else { throw new Error(); }
+    } catch {
+      error.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Create Room';
+    }
+  }
+
+  document.getElementById('room-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') createRoom();
+  });
+</script>
 </body>
 </html>
