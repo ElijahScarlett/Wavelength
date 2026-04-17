@@ -26,29 +26,35 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Home page route
+// Home page
 app.get('/', (req, res) => {
   res.sendFile(require('path').resolve(__dirname, '../public/home.html'));
 });
 
-// Room page route
+// Room page
 app.get('/room/:id', (req, res) => {
   res.sendFile(require('path').resolve(__dirname, '../public/room.html'));
 });
 
-// GET /health
+// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'Wavelength server is running' });
 });
 
-// POST /room - create a room
+// POST /room — create a room (supports is_private + passcode)
 app.post('/room', async (req, res) => {
-  const { name } = req.body;
+  const { name, is_private, passcode } = req.body;
   if (!name) return res.status(400).json({ error: 'Room name is required' });
+
+  const insertData = { name };
+  if (is_private) {
+    insertData.is_private = true;
+    insertData.passcode = passcode;
+  }
 
   const { data, error } = await supabase
     .from('rooms')
-    .insert({ name })
+    .insert(insertData)
     .select()
     .single();
 
@@ -59,7 +65,7 @@ app.post('/room', async (req, res) => {
   res.json({ room: data });
 });
 
-// GET /api/room/:id - get room + queue
+// GET /api/room/:id — get room info + queue
 app.get('/api/room/:id', async (req, res) => {
   const { id } = req.params;
 
@@ -79,10 +85,40 @@ app.get('/api/room/:id', async (req, res) => {
 
   if (queueError) return res.status(500).json({ error: queueError.message });
 
-  res.json({ room, queue });
+  // Never send the passcode to the client — just send is_private flag
+  res.json({
+    room: {
+      id: room.id,
+      name: room.name,
+      is_private: room.is_private || false,
+      created_at: room.created_at
+    },
+    queue
+  });
 });
 
-// POST /room/:id/queue - add a song
+// POST /api/room/:id/verify — verify passcode for private rooms
+app.post('/api/room/:id/verify', async (req, res) => {
+  const { id } = req.params;
+  const { passcode } = req.body;
+
+  const { data: room, error } = await supabase
+    .from('rooms')
+    .select('passcode, is_private')
+    .eq('id', id)
+    .single();
+
+  if (error) return res.status(404).json({ error: 'Room not found' });
+  if (!room.is_private) return res.json({ valid: true }); // public room, always valid
+
+  if (room.passcode === passcode) {
+    res.json({ valid: true });
+  } else {
+    res.json({ valid: false });
+  }
+});
+
+// POST /room/:id/queue — add a song
 app.post('/room/:id/queue', async (req, res) => {
   const { id } = req.params;
   const { track_name, artist_name, added_by, image_url, spotify_uri } = req.body;
@@ -103,7 +139,7 @@ app.post('/room/:id/queue', async (req, res) => {
   res.json({ item: data });
 });
 
-// GET /auth/spotify - redirect to Spotify login
+// GET /auth/spotify — redirect to Spotify login
 app.get('/auth/spotify', (req, res) => {
   const scope = 'streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state';
   const params = new URLSearchParams({
@@ -115,7 +151,7 @@ app.get('/auth/spotify', (req, res) => {
   res.redirect(`https://accounts.spotify.com/authorize?${params}`);
 });
 
-// GET /callback - Spotify sends user back here
+// GET /callback — Spotify OAuth callback
 app.get('/callback', async (req, res) => {
   const code = req.query.code;
   if (!code) return res.status(400).send('No code provided');
@@ -149,9 +185,9 @@ app.get('/callback', async (req, res) => {
   `);
 });
 
-// POST /spotify/play - play a track on user's Spotify
+// POST /spotify/play — play a track on user's active Spotify device
 app.post('/spotify/play', async (req, res) => {
-  const { access_token, track_uri } = req.body;
+  const { access_token, track_uri, device_id } = req.body;
 
   const response = await fetch('https://api.spotify.com/v1/me/player/play', {
     method: 'PUT',
@@ -159,7 +195,7 @@ app.post('/spotify/play', async (req, res) => {
       'Authorization': `Bearer ${access_token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ uris: [track_uri], device_id: req.body.device_id }),
+    body: JSON.stringify({ uris: [track_uri], ...(device_id && { device_id }) }),
   });
 
   if (response.status === 204) {
@@ -170,7 +206,7 @@ app.post('/spotify/play', async (req, res) => {
   }
 });
 
-// GET /spotify/search - search for tracks
+// GET /spotify/search — search for tracks
 app.get('/spotify/search', async (req, res) => {
   const { query, access_token } = req.query;
   if (!query || !access_token) return res.status(400).json({ error: 'Missing query or token' });
@@ -194,7 +230,7 @@ app.get('/spotify/search', async (req, res) => {
   res.json({ tracks });
 });
 
-// WebSocket connection
+// WebSocket
 const roomMembers = {};
 
 io.on('connection', (socket) => {
@@ -223,7 +259,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Wavelength server running on http://localhost:${PORT}`);
