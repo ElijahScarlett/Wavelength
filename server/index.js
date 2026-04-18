@@ -1,6 +1,6 @@
 // server/index.js
 // Wavelength backend server
-// Handles rooms, queue, real-time sync, and Spotify OAuth
+// Handles rooms, queue, real-time sync, Spotify OAuth, and playback state sync
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const express = require('express');
@@ -109,13 +109,9 @@ app.post('/api/room/:id/verify', async (req, res) => {
     .single();
 
   if (error) return res.status(404).json({ error: 'Room not found' });
-  if (!room.is_private) return res.json({ valid: true }); // public room, always valid
+  if (!room.is_private) return res.json({ valid: true });
 
-  if (room.passcode === passcode) {
-    res.json({ valid: true });
-  } else {
-    res.json({ valid: false });
-  }
+  res.json({ valid: room.passcode === passcode });
 });
 
 // POST /room/:id/queue — add a song
@@ -176,9 +172,9 @@ app.get('/callback', async (req, res) => {
 
   res.send(`
     <script>
-      window.opener.postMessage({ 
-        type: 'spotify-auth', 
-        access_token: '${data.access_token}' 
+      window.opener.postMessage({
+        type: 'spotify-auth',
+        access_token: '${data.access_token}'
       }, '*');
       window.close();
     </script>
@@ -186,8 +182,13 @@ app.get('/callback', async (req, res) => {
 });
 
 // POST /spotify/play — play a track on user's active Spotify device
+// Also accepts position_ms to seek to a specific point (for sync)
 app.post('/spotify/play', async (req, res) => {
-  const { access_token, track_uri, device_id } = req.body;
+  const { access_token, track_uri, device_id, position_ms } = req.body;
+
+  const bodyData = { uris: [track_uri] };
+  if (device_id) bodyData.device_id = device_id;
+  if (position_ms !== undefined) bodyData.position_ms = position_ms;
 
   const response = await fetch('https://api.spotify.com/v1/me/player/play', {
     method: 'PUT',
@@ -195,7 +196,7 @@ app.post('/spotify/play', async (req, res) => {
       'Authorization': `Bearer ${access_token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ uris: [track_uri], ...(device_id && { device_id }) }),
+    body: JSON.stringify(bodyData),
   });
 
   if (response.status === 204) {
@@ -211,9 +212,10 @@ app.get('/spotify/search', async (req, res) => {
   const { query, access_token } = req.query;
   if (!query || !access_token) return res.status(400).json({ error: 'Missing query or token' });
 
-  const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=5`, {
-    headers: { 'Authorization': `Bearer ${access_token}` }
-  });
+  const response = await fetch(
+    `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=5`,
+    { headers: { 'Authorization': `Bearer ${access_token}` } }
+  );
 
   const data = await response.json();
   if (data.error) return res.status(400).json({ error: data.error });
@@ -228,6 +230,38 @@ app.get('/spotify/search', async (req, res) => {
   }));
 
   res.json({ tracks });
+});
+
+// ── ROOM STATE (in-memory) ──
+// Tracks what's currently playing in each room so late joiners can sync
+// Structure: { [roomId]: { track_name, artist_name, image_url, spotify_uri, duration, started_at, elapsed_at_start, is_paused } }
+const roomState = {};
+
+// GET /api/room/:id/state — get current playback state for a room
+app.get('/api/room/:id/state', (req, res) => {
+  const { id } = req.params;
+  const state = roomState[id];
+  if (!state) return res.json({ playing: false });
+
+  // Calculate current elapsed seconds
+  let elapsed = state.elapsed_at_start;
+  if (!state.is_paused) {
+    elapsed += Math.floor((Date.now() - state.started_at) / 1000);
+  }
+
+  // Cap at duration
+  if (elapsed >= state.duration) elapsed = state.duration;
+
+  res.json({
+    playing: true,
+    track_name: state.track_name,
+    artist_name: state.artist_name,
+    image_url: state.image_url,
+    spotify_uri: state.spotify_uri,
+    duration: state.duration,
+    elapsed,
+    is_paused: state.is_paused
+  });
 });
 
 // WebSocket
@@ -247,6 +281,48 @@ io.on('connection', (socket) => {
     roomMembers[roomId][socket.id] = { name };
     socket.roomId = roomId;
     io.to(roomId).emit('member:update', roomMembers[roomId]);
+  });
+
+  // Host broadcasts when a new song starts playing
+  // Saves state so late joiners can sync
+  socket.on('playback:started', ({ roomId, track_name, artist_name, image_url, spotify_uri, duration, elapsed }) => {
+    roomState[roomId] = {
+      track_name,
+      artist_name,
+      image_url,
+      spotify_uri,
+      duration,
+      elapsed_at_start: elapsed || 0,
+      started_at: Date.now(),
+      is_paused: false
+    };
+    // Broadcast to all OTHER users in room (not the sender) so they sync
+    socket.to(roomId).emit('playback:sync', {
+      track_name,
+      artist_name,
+      image_url,
+      spotify_uri,
+      duration,
+      elapsed: elapsed || 0
+    });
+  });
+
+  // Host broadcasts pause/resume
+  socket.on('playback:pause', ({ roomId, elapsed }) => {
+    if (roomState[roomId]) {
+      roomState[roomId].is_paused = true;
+      roomState[roomId].elapsed_at_start = elapsed;
+    }
+    socket.to(roomId).emit('playback:paused', { elapsed });
+  });
+
+  socket.on('playback:resume', ({ roomId, elapsed }) => {
+    if (roomState[roomId]) {
+      roomState[roomId].is_paused = false;
+      roomState[roomId].elapsed_at_start = elapsed;
+      roomState[roomId].started_at = Date.now();
+    }
+    socket.to(roomId).emit('playback:resumed', { elapsed });
   });
 
   socket.on('disconnect', () => {
