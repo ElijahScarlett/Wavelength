@@ -4,254 +4,446 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wavelength</title>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <style>
-    :root { --green: #1db954; --bg: #080810; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { height: 100%; background: var(--bg); color: #fff; font-family: 'DM Sans', sans-serif; overflow: hidden; }
+    * { margin:0; padding:0; box-sizing:border-box; }
 
-    .layout { height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
+    body {
+      background: #080a10;
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
 
-    .left { display: flex; flex-direction: column; justify-content: center; padding: 60px 56px 60px 64px; position: relative; z-index: 2; }
+    /* Ambient orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(90px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .orb-1 { width:500px; height:500px; background:rgba(29,185,84,0.07); top:-150px; left:-150px; }
+    .orb-2 { width:600px; height:600px; background:rgba(80,40,160,0.06); bottom:-200px; right:-200px; }
+    .orb-3 { width:350px; height:350px; background:rgba(29,185,84,0.04); bottom:80px; left:42%; }
 
-    .wordmark { font-family: 'Syne', sans-serif; font-size: 10px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--green); margin-bottom: 48px; display: flex; align-items: center; gap: 10px; }
-    .wordmark::before { content: ''; display: inline-block; width: 6px; height: 6px; background: var(--green); transform: rotate(45deg); flex-shrink: 0; }
+    /* ── LEFT COLUMN ── */
+    .left {
+      position: relative; z-index: 1;
+      flex: 0 0 480px;
+      display: flex; flex-direction: column;
+      justify-content: center;
+      padding: 60px 56px;
+      border-right: 1px solid rgba(255,255,255,0.05);
+    }
 
-    .headline { font-family: 'Syne', sans-serif; font-size: clamp(44px, 5.5vw, 72px); font-weight: 800; line-height: 1.0; letter-spacing: -0.03em; margin-bottom: 24px; }
-    .headline .accent { display: block; color: transparent; -webkit-text-stroke: 1.5px rgba(255,255,255,0.35); }
-    .headline .lit { display: block; color: #fff; }
+    .wordmark {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: #1db954;
+      font-weight: 800;
+      margin-bottom: 48px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .wordmark::before {
+      content: '';
+      width: 22px; height: 1px;
+      background: #1db954;
+    }
 
-    .sub { font-size: 14px; color: rgba(255,255,255,0.32); line-height: 1.65; max-width: 320px; margin-bottom: 48px; }
+    .headline {
+      font-family: 'Syne', sans-serif;
+      font-size: 52px;
+      font-weight: 800;
+      line-height: 1.0;
+      letter-spacing: -0.03em;
+      margin-bottom: 20px;
+    }
+    .headline .ghost {
+      -webkit-text-stroke: 1px rgba(255,255,255,0.3);
+      color: transparent;
+    }
+    .headline .solid { color: #fff; }
 
-    .form { display: flex; flex-direction: column; gap: 10px; max-width: 340px; }
+    .tagline {
+      font-size: 14px;
+      color: rgba(255,255,255,0.38);
+      line-height: 1.7;
+      margin-bottom: 44px;
+      max-width: 300px;
+    }
 
-    .input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; padding: 15px 20px; color: #fff; font-size: 14px; font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.2s, background 0.2s; }
-    .input:focus { border-color: rgba(29,185,84,0.45); background: rgba(255,255,255,0.07); }
-    .input::placeholder { color: rgba(255,255,255,0.2); }
+    /* DIAMOND decoration */
+    .diamonds {
+      display: flex; align-items: center; gap: 7px;
+      margin-bottom: 36px;
+    }
+    .diamonds::before, .diamonds::after {
+      content: ''; height: 1px; flex: 1;
+      background: linear-gradient(90deg, transparent, rgba(29,185,84,0.25));
+    }
+    .diamonds::after {
+      background: linear-gradient(90deg, rgba(29,185,84,0.25), transparent);
+    }
+    .d { width:7px; height:7px; transform:rotate(45deg); border:1px solid rgba(29,185,84,0.35); }
+    .d.lit { background:#1db954; border-color:#1db954; box-shadow:0 0 7px rgba(29,185,84,0.6); }
 
-    /* Private toggle */
-    .private-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; cursor: pointer; transition: border-color 0.2s, background 0.2s; user-select: none; }
-    .private-row:hover { border-color: rgba(255,255,255,0.12); }
-    .private-row.active { border-color: rgba(29,185,84,0.3); background: rgba(29,185,84,0.04); }
-    .private-label { display: flex; align-items: center; gap: 9px; font-size: 13px; color: rgba(255,255,255,0.45); transition: color 0.2s; }
-    .private-row.active .private-label { color: rgba(255,255,255,0.8); }
-    .toggle { width: 32px; height: 18px; background: rgba(255,255,255,0.1); border-radius: 9px; position: relative; transition: background 0.2s; flex-shrink: 0; }
-    .toggle::after { content: ''; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,0.4); top: 3px; left: 3px; transition: transform 0.2s, background 0.2s; }
-    .toggle.on { background: var(--green); }
-    .toggle.on::after { transform: translateX(14px); background: #000; }
+    /* Form */
+    .form-group { margin-bottom: 10px; }
 
-    /* Passcode slide-in */
-    .passcode-wrap { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.25s ease, opacity 0.25s ease; }
-    .passcode-wrap.open { max-height: 60px; opacity: 1; }
-    .passcode-input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(29,185,84,0.25); border-radius: 12px; padding: 15px 20px; color: #fff; font-size: 20px; font-family: 'DM Sans', sans-serif; outline: none; letter-spacing: 0.4em; text-align: center; transition: border-color 0.2s; }
-    .passcode-input:focus { border-color: rgba(29,185,84,0.5); }
-    .passcode-input::placeholder { letter-spacing: 0.05em; font-size: 13px; color: rgba(255,255,255,0.2); }
+    .input {
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 13px;
+      padding: 15px 18px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .input:focus {
+      border-color: rgba(29,185,84,0.4);
+      background: rgba(255,255,255,0.06);
+    }
+    .input::placeholder { color: rgba(255,255,255,0.18); }
 
-    .btn { width: 100%; background: var(--green); color: #000; border: none; border-radius: 12px; padding: 15px 28px; font-size: 14px; font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; letter-spacing: 0.04em; transition: background 0.2s, transform 0.1s, box-shadow 0.2s; box-shadow: 0 4px 28px rgba(29,185,84,0.28); text-transform: uppercase; }
-    .btn:hover { background: #22e060; transform: translateY(-1px); box-shadow: 0 6px 36px rgba(29,185,84,0.4); }
-    .btn:active { transform: translateY(0); }
-    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+    .private-toggle {
+      display: flex; align-items: center; gap: 10px;
+      margin: 10px 0 14px;
+      cursor: pointer;
+    }
+    .toggle-switch {
+      width: 36px; height: 20px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      position: relative;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .toggle-switch.on { background: #1db954; }
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 14px; height: 14px;
+      border-radius: 50%; background: #fff;
+      transition: left 0.2s;
+    }
+    .toggle-switch.on::after { left: 19px; }
+    .toggle-label { font-size: 13px; color: rgba(255,255,255,0.45); }
 
-    .error { font-size: 12px; color: rgba(255,80,80,0.75); display: none; padding: 0 4px; }
+    .passcode-wrap { margin-bottom: 10px; display: none; }
 
-    .footnote { margin-top: 28px; font-size: 11px; color: rgba(255,255,255,0.15); display: flex; align-items: center; gap: 6px; }
-    .footnote span { color: rgba(29,185,84,0.45); }
+    .btn-create {
+      width: 100%;
+      background: #1db954;
+      color: #000;
+      border: none;
+      border-radius: 13px;
+      padding: 15px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'DM Sans', sans-serif;
+      letter-spacing: 0.02em;
+      box-shadow: 0 4px 24px rgba(29,185,84,0.22);
+    }
+    .btn-create:hover {
+      background: #21d45f;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(29,185,84,0.32);
+    }
+    .btn-create:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
 
-    /* Right panel */
-    .right { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-    .right::before { content: ''; position: absolute; left: 0; top: 15%; bottom: 15%; width: 1px; background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.06) 30%, rgba(255,255,255,0.06) 70%, transparent); z-index: 3; }
-    .glow-orb { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; }
-    .orb-a { width: 55vw; height: 55vw; background: radial-gradient(circle, rgba(29,185,84,0.07) 0%, transparent 70%); top: 50%; left: 50%; transform: translate(-50%, -50%); }
-    .orb-b { width: 30vw; height: 30vw; background: rgba(100,60,200,0.08); bottom: -5%; right: -5%; }
-    .orb-c { width: 20vw; height: 20vw; background: rgba(29,185,84,0.06); top: 10%; left: 10%; }
+    .error {
+      color: rgba(255,80,80,0.8); font-size:12px;
+      margin-top:8px; display:none;
+    }
 
-    .preview-card { position: relative; z-index: 2; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 20px; width: 280px; backdrop-filter: blur(20px); animation: float 4s ease-in-out infinite; }
-    @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
-    .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-    .card-room-name { font-family: 'Syne', sans-serif; font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,0.5); display: flex; align-items: center; gap: 6px; }
-    .card-live { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--green); font-weight: 600; }
-    .live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: pulse-dot 1.5s ease-in-out infinite; }
-    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-    .card-now-playing { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-    .card-album { width: 46px; height: 46px; border-radius: 8px; background: linear-gradient(135deg, #1a3a2a, #0d2b1f); flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
-    .card-album::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(29,185,84,0.3), transparent); }
-    .card-track { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
-    .card-artist { font-size: 11px; color: rgba(255,255,255,0.35); }
-    .mini-bar { display: flex; align-items: center; gap: 5px; margin-bottom: 14px; }
-    .mini-line { flex: 1; height: 1px; background: rgba(255,255,255,0.07); position: relative; }
-    .mini-line-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--green); animation: progress 8s linear infinite; }
-    @keyframes progress { 0% { width: 0%; } 100% { width: 100%; } }
-    .mini-diamond { width: 7px; height: 7px; border: 1px solid rgba(29,185,84,0.4); transform: rotate(45deg); background: transparent; flex-shrink: 0; }
-    .mini-diamond.on { background: var(--green); border-color: var(--green); box-shadow: 0 0 5px rgba(29,185,84,0.6); }
-    .card-members { display: flex; align-items: center; gap: 5px; }
-    .m-pill { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; color: rgba(255,255,255,0.6); font-family: 'Syne', sans-serif; }
-    .m-pill.you { background: var(--green); border-color: var(--green); color: #000; }
-    .m-count { font-size: 10px; color: rgba(255,255,255,0.25); margin-left: 4px; }
-    .queue-preview { position: relative; z-index: 2; margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
-    .qp-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 9px 14px; display: flex; align-items: center; gap: 8px; width: 280px; }
-    .qp-item:nth-child(1) { opacity: 0.7; width: 260px; }
-    .qp-item:nth-child(2) { opacity: 0.4; width: 220px; }
-    .qp-num { font-size: 9px; color: rgba(255,255,255,0.2); width: 12px; }
-    .qp-dot { width: 20px; height: 20px; border-radius: 4px; background: rgba(255,255,255,0.07); flex-shrink: 0; }
-    .qp-track { font-size: 11px; color: rgba(255,255,255,0.5); }
+    .footer-note {
+      margin-top: 28px; font-size: 11px;
+      color: rgba(255,255,255,0.15);
+      letter-spacing: 0.02em;
+    }
+    .footer-note span { color: rgba(255,255,255,0.3); }
 
-    body::after { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 100; opacity: 0.35; }
+    /* ── RIGHT COLUMN — ROOM PREVIEW ── */
+    .right {
+      position: relative; z-index: 1;
+      flex: 1;
+      display: flex; align-items: center; justify-content: center;
+      padding: 40px;
+      overflow: hidden;
+    }
+
+    .preview-card {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 28px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+    }
+    .preview-header {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .preview-room-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 15px; font-weight: 700; color: #fff;
+    }
+    .preview-members {
+      display: flex; gap: 5px;
+    }
+    .preview-avatar {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: linear-gradient(135deg,#1db954,#0a7a30);
+      border: 2px solid rgba(255,255,255,0.1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; color: #fff;
+      margin-left: -8px;
+    }
+    .preview-avatar:first-child { margin-left: 0; }
+
+    .preview-art {
+      width: 100%; aspect-ratio: 1;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(29,185,84,0.15), rgba(80,40,160,0.15));
+      margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 48px; opacity: 0.4;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .preview-track { margin-bottom: 16px; }
+    .preview-track-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px; font-weight: 700; color: #fff;
+    }
+    .preview-track-artist { font-size: 12px; color: rgba(255,255,255,0.45); margin-top:3px; }
+
+    /* Diamond progress in preview */
+    .preview-diamonds {
+      display: flex; align-items: center; gap: 0;
+      margin-bottom: 14px;
+    }
+    .preview-line {
+      flex: 1; height: 1px;
+      background: rgba(255,255,255,0.1); position: relative;
+    }
+    .preview-line-fill {
+      position: absolute; top: 0; left: 0;
+      height: 100%; background: rgba(255,255,255,0.5);
+      border-radius: 1px; width: 42%;
+    }
+    .preview-dmd-row {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .preview-dmd {
+      width: 7px; height: 7px; transform: rotate(45deg);
+      border: 1px solid rgba(255,255,255,0.2);
+      background: transparent;
+    }
+    .preview-dmd.lit { background: rgba(255,255,255,0.7); border-color: rgba(255,255,255,0.7); }
+    .preview-line-wrap { flex:1; position:relative; height:20px; display:flex; align-items:center; }
+
+    .preview-queue { display:flex; flex-direction:column; gap:6px; }
+    .preview-q-item {
+      padding: 8px 12px; border-radius: 8px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      font-size: 12px; color: rgba(255,255,255,0.5);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .preview-q-item.active-q { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85); }
+    .preview-q-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: #1db954; flex-shrink:0;
+    }
+
+    /* Animate progress */
+    @keyframes progressAnim {
+      0%   { width: 35%; }
+      100% { width: 65%; }
+    }
+    .preview-line-fill { animation: progressAnim 6s ease-in-out infinite alternate; }
+
+    /* Platforms note */
+    .platforms-note {
+      margin-top: 16px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      font-size: 11px; color: rgba(255,255,255,0.22);
+    }
+    .platform-tag {
+      padding: 3px 10px; border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.3);
+    }
   </style>
 </head>
 <body>
-<div class="layout">
+
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- LEFT -->
   <div class="left">
     <div class="wordmark">Wavelength</div>
+
     <div class="headline">
-      <span class="accent">Same song.</span>
-      <span class="lit">Same moment.</span>
-      <span class="lit">Anywhere.</span>
+      <span class="ghost">Same song.</span><br>
+      <span class="solid">Same moment.</span><br>
+      <span class="solid">Anywhere.</span>
     </div>
-    <p class="sub">Create a room. Drop a song. Everyone hears it at the exact same time — whether they're across the hall or across the country.</p>
-    <div class="form">
+
+    <div class="tagline">
+      Create a shared room. Everyone hears the same song, perfectly in sync — no matter where they are.
+    </div>
+
+    <div class="diamonds">
+      <div class="d lit"></div>
+      <div class="d lit"></div>
+      <div class="d lit"></div>
+      <div class="d"></div>
+      <div class="d"></div>
+    </div>
+
+    <div class="form-group">
       <input class="input" id="room-name" type="text" placeholder="Name your room..." maxlength="40" autocomplete="off"/>
-      <div class="private-row" id="private-row" onclick="togglePrivate()">
-        <div class="private-label">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          Private room
-        </div>
-        <div class="toggle" id="toggle"></div>
-      </div>
-      <div class="passcode-wrap" id="passcode-wrap">
-        <input class="passcode-input" id="passcode" type="text" inputmode="numeric" maxlength="4" placeholder="Set a 4-digit passcode" autocomplete="off"/>
-      </div>
-      <button class="btn" id="create-btn" onclick="createRoom()">Create Room</button>
-      <div class="error" id="error"></div>
     </div>
-    <div class="footnote">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-        <path d="M9 18V5l12-2v13" stroke="rgba(29,185,84,0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="6" cy="18" r="3" stroke="rgba(29,185,84,0.5)" stroke-width="2"/>
-        <circle cx="18" cy="16" r="3" stroke="rgba(29,185,84,0.5)" stroke-width="2"/>
-      </svg>
-      Requires <span>Spotify Premium</span> for playback
+
+    <div class="private-toggle" id="privateToggle">
+      <div class="toggle-switch" id="toggleSwitch"></div>
+      <div class="toggle-label">Private room</div>
+    </div>
+
+    <div class="passcode-wrap" id="passcodeWrap">
+      <input class="input" id="passcode-input" type="number" placeholder="4-digit passcode" maxlength="4" min="0" max="9999"/>
+    </div>
+
+    <button class="btn-create" id="create-btn" onclick="createRoom()">Create Room</button>
+    <div class="error" id="error">Something went wrong. Try again.</div>
+
+    <div class="footer-note">
+      Works with <span>Spotify Premium</span> · <span>Apple Music</span>
     </div>
   </div>
 
+  <!-- RIGHT PREVIEW -->
   <div class="right">
-    <div class="glow-orb orb-a"></div>
-    <div class="glow-orb orb-b"></div>
-    <div class="glow-orb orb-c"></div>
-    <div style="display:flex;flex-direction:column;align-items:center;">
-      <div class="preview-card">
-        <div class="card-top">
-          <div class="card-room-name">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style="opacity:0.4;">
-              <rect x="3" y="11" width="18" height="11" rx="2" stroke="rgba(255,255,255,0.7)" stroke-width="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            friday vibes
-          </div>
-          <div class="card-live"><div class="live-dot"></div> live</div>
-        </div>
-        <div class="card-now-playing">
-          <div class="card-album">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="position:relative;z-index:1;">
-              <path d="M9 18V5l12-2v13" stroke="rgba(29,185,84,0.7)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <circle cx="6" cy="18" r="3" stroke="rgba(29,185,84,0.7)" stroke-width="2"/>
-              <circle cx="18" cy="16" r="3" stroke="rgba(29,185,84,0.7)" stroke-width="2"/>
-            </svg>
-          </div>
-          <div>
-            <div class="card-track">God Did</div>
-            <div class="card-artist">DJ Khaled</div>
-          </div>
-        </div>
-        <div class="mini-bar">
-          <div class="mini-diamond on"></div>
-          <div class="mini-line"><div class="mini-line-fill"></div></div>
-          <div class="mini-diamond on"></div>
-          <div class="mini-line"><div class="mini-line-fill" style="animation-delay:-2s"></div></div>
-          <div class="mini-diamond on"></div>
-          <div class="mini-line"></div>
-          <div class="mini-diamond"></div>
-          <div class="mini-line"></div>
-          <div class="mini-diamond"></div>
-        </div>
-        <div class="card-members">
-          <div class="m-pill you">E</div>
-          <div class="m-pill">J</div>
-          <div class="m-pill">M</div>
-          <div class="m-pill">K</div>
-          <div class="m-count">+2 more</div>
+    <div class="preview-card">
+      <div class="preview-header">
+        <div class="preview-room-name">late night vibes</div>
+        <div class="preview-members">
+          <div class="preview-avatar">E</div>
+          <div class="preview-avatar">W</div>
+          <div class="preview-avatar">J</div>
         </div>
       </div>
-      <div class="queue-preview">
-        <div class="qp-item">
-          <div class="qp-num">1</div>
-          <div class="qp-dot"></div>
-          <div class="qp-track">HUMBLE. — Kendrick Lamar</div>
+
+      <div class="preview-art">◈</div>
+
+      <div class="preview-track">
+        <div class="preview-track-name">Not Like Us</div>
+        <div class="preview-track-artist">Kendrick Lamar</div>
+      </div>
+
+      <div class="preview-diamonds">
+        <div class="preview-line-wrap">
+          <div class="preview-line">
+            <div class="preview-line-fill"></div>
+          </div>
+          <div class="preview-dmd-row">
+            <div class="preview-dmd lit"></div>
+            <div class="preview-dmd lit"></div>
+            <div class="preview-dmd lit"></div>
+            <div class="preview-dmd lit"></div>
+            <div class="preview-dmd"></div>
+            <div class="preview-dmd"></div>
+            <div class="preview-dmd"></div>
+          </div>
         </div>
-        <div class="qp-item">
-          <div class="qp-num">2</div>
-          <div class="qp-dot"></div>
-          <div class="qp-track">Lottery — K Camp</div>
+      </div>
+
+      <div class="preview-queue">
+        <div class="preview-q-item active-q">
+          <div class="preview-q-dot"></div>
+          Not Like Us — Kendrick Lamar
         </div>
+        <div class="preview-q-item">TV Off — Kendrick Lamar</div>
+        <div class="preview-q-item">Squabble Up — Kendrick Lamar</div>
+      </div>
+
+      <div class="platforms-note">
+        <div class="platform-tag">Spotify</div>
+        <div class="platform-tag">Apple Music</div>
       </div>
     </div>
   </div>
-</div>
 
-<script>
-  let isPrivate = false;
+  <script>
+    let isPrivate = false;
 
-  function togglePrivate() {
-    isPrivate = !isPrivate;
-    document.getElementById('toggle').classList.toggle('on', isPrivate);
-    document.getElementById('private-row').classList.toggle('active', isPrivate);
-    document.getElementById('passcode-wrap').classList.toggle('open', isPrivate);
-    if (isPrivate) setTimeout(() => document.getElementById('passcode').focus(), 250);
-  }
+    document.getElementById('privateToggle').addEventListener('click', () => {
+      isPrivate = !isPrivate;
+      document.getElementById('toggleSwitch').classList.toggle('on', isPrivate);
+      document.getElementById('passcodeWrap').style.display = isPrivate ? 'block' : 'none';
+    });
 
-  document.getElementById('passcode').addEventListener('input', function() {
-    this.value = this.value.replace(/\D/g, '').slice(0, 4);
-  });
+    document.getElementById('room-name').addEventListener('keydown', e => {
+      if (e.key === 'Enter') createRoom();
+    });
 
-  async function createRoom() {
-    const input = document.getElementById('room-name');
-    const btn = document.getElementById('create-btn');
-    const error = document.getElementById('error');
-    const name = input.value.trim();
-    if (!name) { input.focus(); return; }
+    async function createRoom() {
+      const input = document.getElementById('room-name');
+      const btn   = document.getElementById('create-btn');
+      const err   = document.getElementById('error');
+      const name  = input.value.trim();
+      if (!name) { input.focus(); return; }
 
-    if (isPrivate) {
-      const passcode = document.getElementById('passcode').value;
-      if (passcode.length !== 4) {
-        error.textContent = 'Enter a 4-digit passcode.';
-        error.style.display = 'block';
-        document.getElementById('passcode').focus();
+      const passcode = isPrivate ? document.getElementById('passcode-input').value.trim() : null;
+      if (isPrivate && (!passcode || passcode.length !== 4)) {
+        err.textContent = 'Enter a 4-digit passcode.';
+        err.style.display = 'block';
         return;
       }
+
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+      err.style.display = 'none';
+
+      try {
+        const res = await fetch('/room', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, is_private: isPrivate, passcode })
+        });
+        const data = await res.json();
+        if (data.room) {
+          window.location.href = `/room/${data.room.id}`;
+        } else { throw new Error(); }
+      } catch {
+        err.textContent = 'Something went wrong. Try again.';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Create Room';
+      }
     }
-
-    btn.disabled = true;
-    btn.textContent = 'Creating...';
-    error.style.display = 'none';
-
-    try {
-      const body = { name };
-      if (isPrivate) { body.is_private = true; body.passcode = document.getElementById('passcode').value; }
-      const res = await fetch('/room', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const data = await res.json();
-      if (data.room) { window.location.href = `/room/${data.room.id}`; }
-      else { throw new Error(); }
-    } catch {
-      error.textContent = 'Something went wrong. Try again.';
-      error.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'Create Room';
-    }
-  }
-
-  document.getElementById('room-name').addEventListener('keydown', e => { if (e.key === 'Enter') createRoom(); });
-</script>
+  </script>
 </body>
 </html>

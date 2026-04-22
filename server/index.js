@@ -1,234 +1,350 @@
 // server/index.js
-// Wavelength backend — rooms, queue, real-time sync, Spotify OAuth, playback state
-
+// Wavelength backend — Spotify OAuth + Apple Music token + rooms + real-time sync
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
-const express = require('express');
-const cors = require('cors');
-const http = require('http');
+
+const express    = require('express');
+const cors       = require('cors');
+const http       = require('http');
 const { Server } = require('socket.io');
+const path       = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const jwt        = require('jsonwebtoken');
+const fs         = require('fs');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SECRET_KEY
-);
-
-const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
-const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
-const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
-
-const app = express();
+const app    = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io     = new Server(server, { cors:{ origin:'*' } });
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, '../public')));
 
-app.get('/', (req, res) => {
-  res.sendFile(require('path').resolve(__dirname, '../public/home.html'));
-});
+// ── Supabase ──────────────────────────────────────────────
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
-app.get('/room/:id', (req, res) => {
-  res.sendFile(require('path').resolve(__dirname, '../public/room.html'));
-});
+// ─────────────────────────────────────────────────────────
+// IN-MEMORY ROOM STATE
+// ─────────────────────────────────────────────────────────
+const rooms = {};
+// rooms[id] = {
+//   queue: [],
+//   currentTrack: null,
+//   isPlaying: false,
+//   positionMs: 0,
+//   lastUpdateTs: Date.now(),
+//   members: Map { socketId -> { name } }
+// }
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'Wavelength server is running' });
-});
+function getRoom(id) {
+  if (!rooms[id]) {
+    rooms[id] = {
+      queue: [],
+      currentTrack: null,
+      isPlaying: false,
+      positionMs: 0,
+      lastUpdateTs: Date.now(),
+      members: new Map()
+    };
+  }
+  return rooms[id];
+}
 
-app.post('/room', async (req, res) => {
-  const { name, is_private, passcode } = req.body;
-  if (!name) return res.status(400).json({ error: 'Room name is required' });
-  const insertData = { name };
-  if (is_private) { insertData.is_private = true; insertData.passcode = passcode; }
-  const { data, error } = await supabase.from('rooms').insert(insertData).select().single();
-  if (error) { console.error('Supabase error:', error.message); return res.status(500).json({ error: error.message }); }
-  res.json({ room: data });
-});
+function getLivePosition(room) {
+  if (!room.isPlaying) return room.positionMs;
+  return room.positionMs + (Date.now() - room.lastUpdateTs);
+}
 
-app.get('/api/room/:id', async (req, res) => {
-  const { id } = req.params;
-  const { data: room, error: roomError } = await supabase.from('rooms').select('*').eq('id', id).single();
-  if (roomError) return res.status(404).json({ error: 'Room not found' });
-  const { data: queue, error: queueError } = await supabase.from('queue_items').select('*').eq('room_id', id).order('position', { ascending: true });
-  if (queueError) return res.status(500).json({ error: queueError.message });
-  res.json({
-    room: { id: room.id, name: room.name, is_private: room.is_private || false, created_at: room.created_at },
-    queue
+// ─────────────────────────────────────────────────────────
+// SPOTIFY OAUTH
+// ─────────────────────────────────────────────────────────
+const SPOTIFY_CLIENT_ID     = process.env.SPOTIFY_CLIENT_ID;
+const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+const SPOTIFY_REDIRECT_URI  = process.env.SPOTIFY_REDIRECT_URI || 'https://wavelength-0nh9.onrender.com/callback';
+
+app.get('/spotify/login', (req, res) => {
+  const scopes = [
+    'streaming',
+    'user-read-email',
+    'user-read-private',
+    'user-modify-playback-state',
+    'user-read-playback-state'
+  ].join(' ');
+  const url = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({
+    response_type: 'code',
+    client_id:     SPOTIFY_CLIENT_ID,
+    scope:         scopes,
+    redirect_uri:  SPOTIFY_REDIRECT_URI
   });
-});
-
-app.post('/api/room/:id/verify', async (req, res) => {
-  const { id } = req.params;
-  const { passcode } = req.body;
-  const { data: room, error } = await supabase.from('rooms').select('passcode, is_private').eq('id', id).single();
-  if (error) return res.status(404).json({ error: 'Room not found' });
-  if (!room.is_private) return res.json({ valid: true });
-  res.json({ valid: room.passcode === passcode });
-});
-
-app.post('/room/:id/queue', async (req, res) => {
-  const { id } = req.params;
-  const { track_name, artist_name, added_by, image_url, spotify_uri } = req.body;
-  if (!track_name || !artist_name) return res.status(400).json({ error: 'track_name and artist_name are required' });
-  const { data, error } = await supabase.from('queue_items').insert({ room_id: id, track_name, artist_name, added_by, image_url, spotify_uri }).select().single();
-  if (error) return res.status(500).json({ error: error.message });
-  io.to(id).emit('queue:updated', { item: data });
-  res.json({ item: data });
-});
-
-app.get('/auth/spotify', (req, res) => {
-  const scope = 'streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state';
-  const params = new URLSearchParams({ response_type: 'code', client_id: SPOTIFY_CLIENT_ID, scope, redirect_uri: SPOTIFY_REDIRECT_URI });
-  res.redirect(`https://accounts.spotify.com/authorize?${params}`);
+  res.redirect(url);
 });
 
 app.get('/callback', async (req, res) => {
   const code = req.query.code;
-  if (!code) return res.status(400).send('No code provided');
-  const body = new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: SPOTIFY_REDIRECT_URI });
-  const response = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Authorization': 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64') },
-    body,
-  });
-  const data = await response.json();
-  if (data.error) return res.status(400).json({ error: data.error });
-  res.send(`<script>window.opener.postMessage({ type: 'spotify-auth', access_token: '${data.access_token}' }, '*'); window.close();</script>`);
-});
-
-// POST /spotify/play — supports position_ms for sync seeking
-app.post('/spotify/play', async (req, res) => {
-  const { access_token, track_uri, device_id, position_ms } = req.body;
-  const bodyData = { uris: [track_uri] };
-  if (device_id) bodyData.device_id = device_id;
-  if (position_ms !== undefined) bodyData.position_ms = position_ms;
-  const url = device_id
-    ? `https://api.spotify.com/v1/me/player/play?device_id=${device_id}`
-    : 'https://api.spotify.com/v1/me/player/play';
-  const response = await fetch(url, {
-    method: 'PUT',
-    headers: { 'Authorization': `Bearer ${access_token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(bodyData),
-  });
-  if (response.status === 204) { res.json({ success: true }); }
-  else { const error = await response.json(); res.status(400).json({ error }); }
-});
-
-app.get('/spotify/search', async (req, res) => {
-  const { query, access_token } = req.query;
-  if (!query || !access_token) return res.status(400).json({ error: 'Missing query or token' });
-  const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=5`, {
-    headers: { 'Authorization': `Bearer ${access_token}` }
-  });
-  const data = await response.json();
-  if (data.error) return res.status(400).json({ error: data.error });
-  const tracks = data.tracks.items.map(t => ({
-    uri: t.uri, name: t.name, artist: t.artists[0].name,
-    album: t.album.name, image: t.album.images[1]?.url,
-    duration: Math.round(t.duration_ms / 1000)
-  }));
-  res.json({ tracks });
-});
-
-// ── IN-MEMORY ROOM STATE ──
-// Tracks live playback state AND the host's current live queue
-// roomState[roomId] = { track_name, artist_name, image_url, spotify_uri, duration, started_at, elapsed_at_start, is_paused, live_queue: [] }
-const roomState = {};
-const roomMembers = {};
-
-// GET /api/room/:id/state — late joiners call this to get current playback position + live queue
-app.get('/api/room/:id/state', (req, res) => {
-  const { id } = req.params;
-  const state = roomState[id];
-  if (!state || !state.track_name) return res.json({ playing: false });
-
-  // Calculate current elapsed, accounting for time since last update
-  let elapsed = state.elapsed_at_start;
-  if (!state.is_paused) {
-    elapsed += Math.floor((Date.now() - state.started_at) / 1000);
+  if (!code) return res.status(400).send('No code');
+  try {
+    const resp = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/x-www-form-urlencoded',
+        'Authorization': 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64')
+      },
+      body: new URLSearchParams({
+        grant_type:   'authorization_code',
+        code,
+        redirect_uri: SPOTIFY_REDIRECT_URI
+      })
+    });
+    const data = await resp.json();
+    if (!data.access_token) return res.status(400).send('Token exchange failed');
+    // Send token back to opener via postMessage
+    res.send(`
+      <script>
+        window.opener.postMessage({ type:'SPOTIFY_TOKEN', token:'${data.access_token}' }, '*');
+        window.close();
+      </script>
+    `);
+  } catch(e) {
+    console.error('Spotify callback error:', e);
+    res.status(500).send('Auth failed');
   }
-  if (elapsed >= state.duration) elapsed = state.duration;
-
-  res.json({
-    playing: true,
-    track_name: state.track_name,
-    artist_name: state.artist_name,
-    image_url: state.image_url,
-    spotify_uri: state.spotify_uri,
-    duration: state.duration,
-    elapsed,
-    is_paused: state.is_paused || false,
-    // The host's live queue (songs still to play) — NOT stale Supabase data
-    live_queue: state.live_queue || []
-  });
 });
 
-io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
+// ─────────────────────────────────────────────────────────
+// APPLE MUSIC DEVELOPER TOKEN
+// ─────────────────────────────────────────────────────────
+// Required env vars:
+//   APPLE_TEAM_ID        — your Apple Developer Team ID (10-char)
+//   APPLE_KEY_ID         — your MusicKit key ID (10-char)
+//   APPLE_PRIVATE_KEY    — full PEM content of your AuthKey_XXXXXX.p8 file
+//                          (or set APPLE_PRIVATE_KEY_PATH to the file path)
+//
+// How to get these:
+//   1. Go to developer.apple.com → Certificates, Identifiers & Profiles → Keys
+//   2. Create a new key, enable "MusicKit"
+//   3. Download the .p8 file — that's your private key
+//   4. Your Team ID is in the top-right of your Apple Developer account
+//   5. The Key ID is shown when you create/view the key
 
-  socket.on('room:join', (roomId) => {
+let appleDevToken = null;
+let appleDevTokenExpiry = 0;
+
+function generateAppleDevToken() {
+  const now = Math.floor(Date.now() / 1000);
+  // Token cached for 23 hours (max is 6 months but we refresh often to be safe)
+  if (appleDevToken && now < appleDevTokenExpiry) return appleDevToken;
+
+  const teamId = process.env.APPLE_TEAM_ID;
+  const keyId  = process.env.APPLE_KEY_ID;
+
+  if (!teamId || !keyId) {
+    console.warn('Apple Music: APPLE_TEAM_ID or APPLE_KEY_ID not set in .env');
+    return null;
+  }
+
+  let privateKey;
+  if (process.env.APPLE_PRIVATE_KEY) {
+    // Key stored directly in env (replace literal \n with newlines)
+    privateKey = process.env.APPLE_PRIVATE_KEY.replace(/\\n/g, '\n');
+  } else if (process.env.APPLE_PRIVATE_KEY_PATH) {
+    privateKey = fs.readFileSync(process.env.APPLE_PRIVATE_KEY_PATH, 'utf8');
+  } else {
+    console.warn('Apple Music: No private key found. Set APPLE_PRIVATE_KEY or APPLE_PRIVATE_KEY_PATH in .env');
+    return null;
+  }
+
+  const expirySeconds = 60 * 60 * 24; // 24 hours
+  appleDevTokenExpiry = now + expirySeconds - 60; // Refresh 1 min before expiry
+
+  appleDevToken = jwt.sign({}, privateKey, {
+    algorithm:  'ES256',
+    expiresIn:  expirySeconds,
+    issuer:     teamId,
+    header: {
+      alg: 'ES256',
+      kid: keyId
+    }
+  });
+
+  return appleDevToken;
+}
+
+app.get('/apple/token', (req, res) => {
+  try {
+    const token = generateAppleDevToken();
+    if (!token) {
+      return res.status(503).json({
+        error: 'Apple Music not configured',
+        hint: 'Set APPLE_TEAM_ID, APPLE_KEY_ID, and APPLE_PRIVATE_KEY in your .env file'
+      });
+    }
+    res.json({ token });
+  } catch(e) {
+    console.error('Apple token error:', e);
+    res.status(500).json({ error: 'Failed to generate Apple developer token' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────
+// ROOM API
+// ─────────────────────────────────────────────────────────
+app.post('/room', async (req, res) => {
+  const { name, is_private, passcode } = req.body;
+  if (!name) return res.status(400).json({ error:'Name required' });
+  const { data, error } = await supabase
+    .from('rooms')
+    .insert({ name, is_private: !!is_private, passcode: passcode || null })
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error });
+  res.json({ room: data });
+});
+
+app.get('/api/room/:id', async (req, res) => {
+  const { data, error } = await supabase
+    .from('rooms')
+    .select('id, name, is_private')
+    .eq('id', req.params.id)
+    .single();
+  if (error) return res.status(404).json({ error:'Room not found' });
+  res.json(data);
+});
+
+app.post('/api/room/:id/verify', async (req, res) => {
+  const { passcode } = req.body;
+  const { data } = await supabase
+    .from('rooms')
+    .select('passcode')
+    .eq('id', req.params.id)
+    .single();
+  if (!data) return res.status(404).json({ ok:false });
+  res.json({ ok: data.passcode === passcode });
+});
+
+// ─────────────────────────────────────────────────────────
+// SOCKET.IO — REAL-TIME SYNC
+// ─────────────────────────────────────────────────────────
+io.on('connection', socket => {
+  let currentRoomId = null;
+  let memberName    = null;
+
+  socket.on('join', ({ roomId, name }) => {
+    currentRoomId = roomId;
+    memberName    = name;
     socket.join(roomId);
-    socket.roomId = roomId;
-    console.log(`User ${socket.id} joined room ${roomId}`);
-  });
 
-  socket.on('member:join', ({ roomId, name }) => {
-    if (!roomMembers[roomId]) roomMembers[roomId] = {};
-    roomMembers[roomId][socket.id] = { name };
-    socket.roomId = roomId;
-    io.to(roomId).emit('member:update', roomMembers[roomId]);
-  });
+    const room = getRoom(roomId);
+    room.members.set(socket.id, { name });
 
-  // Host tells server: new song started + current live queue
-  socket.on('playback:started', ({ roomId, track_name, artist_name, image_url, spotify_uri, duration, elapsed, live_queue }) => {
-    if (!roomState[roomId]) roomState[roomId] = {};
-    Object.assign(roomState[roomId], {
-      track_name, artist_name, image_url, spotify_uri, duration,
-      elapsed_at_start: elapsed || 0,
-      started_at: Date.now(),
-      is_paused: false,
-      live_queue: live_queue || []
-    });
-    // Tell all OTHER users to sync — include server timestamp so they can calculate network delay
-    socket.to(roomId).emit('playback:sync', {
-      track_name, artist_name, image_url, spotify_uri, duration,
-      elapsed: elapsed || 0,
-      server_ts: Date.now(), // client uses this to correct for latency
-      live_queue: live_queue || []
+    // Broadcast updated members list
+    broadcastMembers(roomId);
+
+    // Send current room state to new joiner
+    socket.emit('roomState', {
+      queue:        room.queue,
+      currentTrack: room.currentTrack,
+      isPlaying:    room.isPlaying,
+      positionMs:   getLivePosition(room),
+      server_ts:    Date.now()
     });
   });
 
-  // Host updates live queue (song added/removed/reordered)
-  socket.on('queue:sync', ({ roomId, live_queue }) => {
-    if (roomState[roomId]) roomState[roomId].live_queue = live_queue;
-    socket.to(roomId).emit('queue:host_sync', { live_queue });
+  // ── Playback events ──
+  socket.on('play', ({ roomId, track, server_ts }) => {
+    const room = getRoom(roomId);
+    room.currentTrack   = track;
+    room.isPlaying      = true;
+    room.positionMs     = 0;
+    room.lastUpdateTs   = Date.now();
+    // Add to queue if not already there
+    if (!room.queue.find(t => t.id === track.id)) {
+      room.queue.push(track);
+      io.to(roomId).emit('queueUpdate', room.queue);
+    }
+    io.to(roomId).emit('play', { track, positionMs:0, server_ts:Date.now() });
   });
 
-  // Host pauses
-  socket.on('playback:pause', ({ roomId, elapsed }) => {
-    if (roomState[roomId]) { roomState[roomId].is_paused = true; roomState[roomId].elapsed_at_start = elapsed; }
-    socket.to(roomId).emit('playback:paused', { elapsed });
+  socket.on('addSong', ({ roomId, track }) => {
+    const room = getRoom(roomId);
+    if (!room.queue.find(t => t.id === track.id)) {
+      room.queue.push(track);
+    }
+    io.to(roomId).emit('queueUpdate', room.queue);
   });
 
-  // Host resumes
-  socket.on('playback:resume', ({ roomId, elapsed }) => {
-    if (roomState[roomId]) { roomState[roomId].is_paused = false; roomState[roomId].elapsed_at_start = elapsed; roomState[roomId].started_at = Date.now(); }
-    socket.to(roomId).emit('playback:resumed', { elapsed });
+  socket.on('playState', ({ roomId, isPlaying, positionMs }) => {
+    const room = getRoom(roomId);
+    room.isPlaying    = isPlaying;
+    room.positionMs   = positionMs || 0;
+    room.lastUpdateTs = Date.now();
+    socket.to(roomId).emit('playState', { isPlaying, positionMs, server_ts:Date.now() });
+  });
+
+  socket.on('seek', ({ roomId, positionMs }) => {
+    const room = getRoom(roomId);
+    room.positionMs   = positionMs;
+    room.lastUpdateTs = Date.now();
+    socket.to(roomId).emit('seek', { positionMs, server_ts:Date.now() });
+  });
+
+  socket.on('nextSong', ({ roomId }) => {
+    const room = getRoom(roomId);
+    if (!room.queue.length) return;
+    const idx = room.queue.findIndex(t => t.id === room.currentTrack?.id);
+    const next = room.queue[idx + 1];
+    if (next) {
+      room.currentTrack = next;
+      room.positionMs   = 0;
+      room.lastUpdateTs = Date.now();
+      io.to(roomId).emit('play', { track:next, positionMs:0, server_ts:Date.now() });
+    }
+  });
+
+  socket.on('prevSong', ({ roomId }) => {
+    const room = getRoom(roomId);
+    if (!room.queue.length) return;
+    const idx = room.queue.findIndex(t => t.id === room.currentTrack?.id);
+    const prev = room.queue[idx - 1];
+    if (prev) {
+      room.currentTrack = prev;
+      room.positionMs   = 0;
+      room.lastUpdateTs = Date.now();
+      io.to(roomId).emit('play', { track:prev, positionMs:0, server_ts:Date.now() });
+    }
   });
 
   socket.on('disconnect', () => {
-    const roomId = socket.roomId;
-    if (roomId && roomMembers[roomId]) {
-      delete roomMembers[roomId][socket.id];
-      io.to(roomId).emit('member:update', roomMembers[roomId]);
+    if (currentRoomId) {
+      const room = rooms[currentRoomId];
+      if (room) {
+        room.members.delete(socket.id);
+        broadcastMembers(currentRoomId);
+      }
     }
-    console.log('User disconnected:', socket.id);
   });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Wavelength server running on http://localhost:${PORT}`);
+function broadcastMembers(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+  const members = Array.from(room.members.values());
+  io.to(roomId).emit('members', members);
+}
+
+// ─────────────────────────────────────────────────────────
+// STATIC ROUTES
+// ─────────────────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/home.html'));
 });
+app.get('/room/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/room.html'));
+});
+
+// ─────────────────────────────────────────────────────────
+// START
+// ─────────────────────────────────────────────────────────
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Wavelength running on port ${PORT}`));
