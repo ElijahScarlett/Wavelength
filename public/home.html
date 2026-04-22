@@ -442,6 +442,8 @@
     document.getElementById('join-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') joinRoom();
     });
+
+    function joinRoom() {
       const raw = document.getElementById('join-input').value.trim();
       const err = document.getElementById('join-error');
       if (!raw) { document.getElementById('join-input').focus(); return; }
