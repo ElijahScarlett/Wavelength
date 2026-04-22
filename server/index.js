@@ -188,6 +188,21 @@ app.get('/apple/token', (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────
+
+// SPOTIFY SEARCH PROXY
+app.get('/spotify/search', async (req, res) => {
+  const { q, token } = req.query;
+  if (!q || !token) return res.status(400).json({ error: 'Missing params' });
+  try {
+    const r = await fetch(
+      'https://api.spotify.com/v1/search?q=' + encodeURIComponent(q) + '&type=track&limit=12',
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    const data = await r.json();
+    res.json(data);
+  } catch(e) { res.status(500).json({ error: 'Search failed' }); }
+});
+
 // ROOM API
 // ─────────────────────────────────────────────────────────
 app.post('/room', async (req, res) => {
