@@ -164,6 +164,26 @@
     }
     .btn-create:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
 
+    .divider-line {
+      display:flex; align-items:center; gap:12px;
+      margin:16px 0 12px; color:rgba(255,255,255,0.18); font-size:11px;
+      letter-spacing:0.06em; text-transform:uppercase;
+    }
+    .divider-line::before,.divider-line::after {
+      content:''; flex:1; height:1px; background:rgba(255,255,255,0.08);
+    }
+    .join-row { display:flex; gap:8px; }
+    .join-row .input { flex:1; margin-bottom:0; }
+    .btn-join {
+      background:rgba(255,255,255,0.1); color:#fff;
+      border:1px solid rgba(255,255,255,0.15);
+      border-radius:13px; padding:15px 18px;
+      font-size:14px; font-weight:600; cursor:pointer;
+      transition:all 0.2s; font-family:'DM Sans',sans-serif;
+      white-space:nowrap; flex-shrink:0;
+    }
+    .btn-join:hover { background:rgba(255,255,255,0.16); }
+
     .error {
       color: rgba(255,80,80,0.8); font-size:12px;
       margin-top:8px; display:none;
@@ -339,6 +359,17 @@
     <button class="btn-create" id="create-btn" onclick="createRoom()">Create Room</button>
     <div class="error" id="error">Something went wrong. Try again.</div>
 
+    <div class="divider-line">
+      <span>or join an existing room</span>
+    </div>
+
+    <div class="form-group join-row">
+      <input class="input" id="join-input" type="text" placeholder="Paste room link or ID..."
+        autocomplete="off" autocorrect="off" spellcheck="false"/>
+      <button class="btn-join" onclick="joinRoom()">Join</button>
+    </div>
+    <div class="error" id="join-error">Invalid room link. Try again.</div>
+
     <div class="footer-note">
       Works with <span>Spotify Premium</span> · <span>Apple Music</span>
     </div>
@@ -408,7 +439,24 @@
     document.getElementById('room-name').addEventListener('keydown', e => {
       if (e.key === 'Enter') createRoom();
     });
-
+    document.getElementById('join-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') joinRoom();
+    });
+      const raw = document.getElementById('join-input').value.trim();
+      const err = document.getElementById('join-error');
+      if (!raw) { document.getElementById('join-input').focus(); return; }
+      // Accept full URL or just a room ID (UUID format)
+      let roomId = raw;
+      try {
+        const url = new URL(raw);
+        roomId = url.pathname.split('/').filter(Boolean).pop();
+      } catch(e) {
+        roomId = raw.split('/').filter(Boolean).pop();
+      }
+      if (!roomId || roomId.length < 8) { err.style.display='block'; return; }
+      err.style.display='none';
+      window.location.href = `/room/${roomId}`;
+    }
     async function createRoom() {
       const input = document.getElementById('room-name');
       const btn   = document.getElementById('create-btn');
