@@ -156,14 +156,56 @@ app.post('/room/:id/queue', async (req, res) => {
 const roomState   = {};
 const roomMembers = {};
 
-app.get('/api/room/:id/state', (req, res) => {
-  const state = roomState[req.params.id];
+// Persist state to Supabase
+async function saveRoomState(roomId, state) {
+  try {
+    await supabase.from('room_state').upsert({
+      room_id:       roomId,
+      track_name:    state.track_name,
+      artist_name:   state.artist_name,
+      image_url:     state.image_url,
+      spotify_uri:   state.spotify_uri,
+      duration:      state.duration,
+      elapsed:       state.elapsed_at_start,
+      is_paused:     state.is_paused || false,
+      live_queue:    JSON.stringify(state.live_queue || []),
+      updated_at:    new Date().toISOString()
+    }, { onConflict: 'room_id' });
+  } catch(e) { console.error('saveRoomState error:', e.message); }
+}
+
+app.get('/api/room/:id/state', async (req, res) => {
+  const id = req.params.id;
+  let state = roomState[id];
+
+  // If not in memory (server restarted), try Supabase
+  if (!state || !state.track_name) {
+    try {
+      const { data } = await supabase.from('room_state').select('*').eq('room_id', id).single();
+      if (data && data.track_name) {
+        // Restore to memory
+        roomState[id] = {
+          track_name:       data.track_name,
+          artist_name:      data.artist_name,
+          image_url:        data.image_url,
+          spotify_uri:      data.spotify_uri,
+          duration:         data.duration,
+          elapsed_at_start: data.elapsed,
+          started_at:       Date.now(),
+          is_paused:        true, // safe default — don't auto-resume
+          live_queue:       JSON.parse(data.live_queue || '[]')
+        };
+        state = roomState[id];
+      }
+    } catch(e) { /* no saved state */ }
+  }
+
   if (!state || !state.track_name) return res.json({ playing: false });
   let elapsed = state.elapsed_at_start;
   if (!state.is_paused) elapsed += Math.floor((Date.now() - state.started_at) / 1000);
   if (elapsed >= state.duration) elapsed = state.duration;
   res.json({
-    playing: true,
+    playing:     true,
     track_name:  state.track_name,
     artist_name: state.artist_name,
     image_url:   state.image_url,
@@ -207,6 +249,7 @@ io.on('connection', socket => {
       is_paused: false,
       live_queue: live_queue || []
     });
+    saveRoomState(roomId, roomState[roomId]);
     socket.to(roomId).emit('playback:sync', {
       track_name, artist_name, image_url, spotify_uri, duration,
       elapsed: elapsed || 0, server_ts: Date.now(),
@@ -215,12 +258,19 @@ io.on('connection', socket => {
   });
 
   socket.on('queue:sync', ({ roomId, live_queue }) => {
-    if (roomState[roomId]) roomState[roomId].live_queue = live_queue;
+    if (roomState[roomId]) {
+      roomState[roomId].live_queue = live_queue;
+      saveRoomState(roomId, roomState[roomId]);
+    }
     socket.to(roomId).emit('queue:host_sync', { live_queue });
   });
 
   socket.on('playback:pause', ({ roomId, elapsed }) => {
-    if (roomState[roomId]) { roomState[roomId].is_paused = true; roomState[roomId].elapsed_at_start = elapsed; }
+    if (roomState[roomId]) {
+      roomState[roomId].is_paused = true;
+      roomState[roomId].elapsed_at_start = elapsed;
+      saveRoomState(roomId, roomState[roomId]);
+    }
     socket.to(roomId).emit('playback:paused', { elapsed });
   });
 
@@ -229,6 +279,7 @@ io.on('connection', socket => {
       roomState[roomId].is_paused = false;
       roomState[roomId].elapsed_at_start = elapsed;
       roomState[roomId].started_at = Date.now();
+      saveRoomState(roomId, roomState[roomId]);
     }
     socket.to(roomId).emit('playback:resumed', { elapsed });
   });
