@@ -199,8 +199,15 @@ app.get('/spotify/search', async (req, res) => {
       { headers: { Authorization: 'Bearer ' + token } }
     );
     const data = await r.json();
+    if (!r.ok) {
+      console.error('Spotify search error:', r.status, JSON.stringify(data));
+      return res.status(r.status).json(data);
+    }
     res.json(data);
-  } catch(e) { res.status(500).json({ error: 'Search failed' }); }
+  } catch(e) {
+    console.error('Search proxy error:', e.message);
+    res.status(500).json({ error: 'Search failed', detail: e.message });
+  }
 });
 
 // ROOM API
