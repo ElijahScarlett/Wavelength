@@ -195,7 +195,7 @@ app.get('/spotify/search', async (req, res) => {
   if (!q || !token) return res.status(400).json({ error: 'Missing params' });
   try {
     const r = await fetch(
-      'https://api.spotify.com/v1/search?q=' + encodeURIComponent(q) + '&type=track&limit=12',
+      'https://api.spotify.com/v1/search?q=' + encodeURIComponent(q) + '&type=track&limit=12&market=US',
       { headers: { Authorization: 'Bearer ' + token } }
     );
     const data = await r.json();
