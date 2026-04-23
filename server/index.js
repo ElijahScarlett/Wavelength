@@ -186,7 +186,9 @@ io.on('connection', socket => {
 
   socket.on('member:join', ({ roomId, name }) => {
     if (!roomMembers[roomId]) roomMembers[roomId] = {};
-    roomMembers[roomId][socket.id] = { name };
+    // First member to join is the host
+    const isFirstMember = Object.keys(roomMembers[roomId]).length === 0;
+    roomMembers[roomId][socket.id] = { name, isHost: isFirstMember };
     socket.roomId = roomId;
     io.to(roomId).emit('member:update', roomMembers[roomId]);
   });
@@ -226,11 +228,78 @@ io.on('connection', socket => {
     socket.to(roomId).emit('playback:resumed', { elapsed });
   });
 
+  // Host passes their role to another member
+  socket.on('host:pass', ({ roomId, toSocketId }) => {
+    if (!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if (!me?.isHost) return; // only host can pass
+    const target = roomMembers[roomId][toSocketId];
+    if (!target) return;
+    me.isHost = false;
+    target.isHost = true;
+    target.isCoHost = false; // promoted to full host
+    io.to(roomId).emit('member:update', roomMembers[roomId]);
+    io.to(roomId).emit('room:notify', { msg: `${target.name} is now the host` });
+  });
+
+  // Host grants/revokes co-host
+  socket.on('host:cohost', ({ roomId, toSocketId, grant }) => {
+    if (!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if (!me?.isHost) return;
+    const target = roomMembers[roomId][toSocketId];
+    if (!target) return;
+    target.isCoHost = grant;
+    io.to(roomId).emit('member:update', roomMembers[roomId]);
+    io.to(roomId).emit('room:notify', { msg: grant ? `${target.name} is now a co-host` : `${target.name} is no longer a co-host` });
+  });
+
+  // Host toggles open controls for all listeners
+  socket.on('host:permissions', ({ roomId, openControls }) => {
+    if (!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if (!me?.isHost) return;
+    if (!roomState[roomId]) roomState[roomId] = {};
+    roomState[roomId].openControls = openControls;
+    io.to(roomId).emit('permissions:update', { openControls });
+    io.to(roomId).emit('room:notify', { msg: openControls ? 'Everyone can now control playback' : 'Only the host can control playback' });
+  });
+
+  // Host grants specific member playback permission
+  socket.on('host:grant', ({ roomId, toSocketId, grant }) => {
+    if (!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if (!me?.isHost && !me?.isCoHost) return;
+    const target = roomMembers[roomId][toSocketId];
+    if (!target) return;
+    target.canControl = grant;
+    io.to(roomId).emit('member:update', roomMembers[roomId]);
+    io.to(roomId).emit('room:notify', { msg: grant ? `${target.name} can now control playback` : `${target.name}'s controls removed` });
+  });
+
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
     if (roomId && roomMembers[roomId]) {
+      const leaving = roomMembers[roomId][socket.id];
+      const wasHost = leaving?.isHost;
+      const leavingName = leaving?.name || 'Someone';
       delete roomMembers[roomId][socket.id];
-      io.to(roomId).emit('member:update', roomMembers[roomId]);
+
+      // If host left, promote next member
+      if (wasHost) {
+        const remaining = Object.entries(roomMembers[roomId]);
+        if (remaining.length > 0) {
+          const [newHostId, newHostMember] = remaining[0];
+          newHostMember.isHost = true;
+          io.to(roomId).emit('member:update', roomMembers[roomId]);
+          io.to(roomId).emit('room:notify', { msg: `${leavingName} left · ${newHostMember.name} is now the host` });
+        }
+      } else {
+        io.to(roomId).emit('member:update', roomMembers[roomId]);
+        if (leavingName !== 'Someone') {
+          io.to(roomId).emit('room:notify', { msg: `${leavingName} left the room` });
+        }
+      }
     }
     console.log('Disconnected:', socket.id);
   });
