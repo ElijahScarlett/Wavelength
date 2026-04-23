@@ -186,7 +186,12 @@ io.on('connection', socket => {
 
   socket.on('member:join', ({ roomId, name }) => {
     if (!roomMembers[roomId]) roomMembers[roomId] = {};
-    // First member to join is the host
+    // Reject duplicate names
+    const taken = Object.values(roomMembers[roomId]).some(m => m.name.toLowerCase() === name.toLowerCase());
+    if (taken) {
+      socket.emit('join:rejected', { reason: `The name "${name}" is already taken in this room.` });
+      return;
+    }
     const isFirstMember = Object.keys(roomMembers[roomId]).length === 0;
     roomMembers[roomId][socket.id] = { name, isHost: isFirstMember };
     socket.roomId = roomId;
