@@ -6,15 +6,38 @@
   <title>Wavelength</title>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <style>
+    :root {
+      --bg: #080a10;
+      --text: #fff;
+      --text-dim: rgba(255,255,255,0.38);
+      --border: rgba(255,255,255,0.08);
+      --input-bg: rgba(255,255,255,0.04);
+      --input-border: rgba(255,255,255,0.09);
+      --card-bg: rgba(255,255,255,0.04);
+      --card-border: rgba(255,255,255,0.08);
+      --divider: rgba(255,255,255,0.05);
+    }
+    html.light {
+      --bg: #f0f2f5;
+      --text: #0d0f14;
+      --text-dim: rgba(0,0,0,0.45);
+      --border: rgba(0,0,0,0.08);
+      --input-bg: rgba(0,0,0,0.04);
+      --input-border: rgba(0,0,0,0.1);
+      --card-bg: rgba(255,255,255,0.7);
+      --card-border: rgba(0,0,0,0.07);
+      --divider: rgba(0,0,0,0.06);
+    }
     * { margin:0; padding:0; box-sizing:border-box; }
 
     body {
-      background: #080a10;
-      color: #fff;
+      background: var(--bg);
+      color: var(--text);
       font-family: 'DM Sans', sans-serif;
       min-height: 100vh;
       display: flex;
       overflow: hidden;
+      transition: background 0.3s, color 0.3s;
     }
 
     /* Ambient orbs */
@@ -36,7 +59,7 @@
       display: flex; flex-direction: column;
       justify-content: center;
       padding: 60px 56px;
-      border-right: 1px solid rgba(255,255,255,0.05);
+      border-right: 1px solid var(--divider);
     }
 
     .wordmark {
@@ -73,7 +96,7 @@
 
     .tagline {
       font-size: 14px;
-      color: rgba(255,255,255,0.38);
+      color: var(--text-dim);
       line-height: 1.7;
       margin-bottom: 44px;
       max-width: 300px;
@@ -99,8 +122,8 @@
 
     .input {
       width: 100%;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.09);
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
       border-radius: 13px;
       padding: 15px 18px;
       color: #fff;
@@ -113,7 +136,7 @@
       border-color: rgba(29,185,84,0.4);
       background: rgba(255,255,255,0.06);
     }
-    .input::placeholder { color: rgba(255,255,255,0.18); }
+    .input::placeholder { color: rgba(0,0,0,0.25); }
 
     .private-toggle {
       display: flex; align-items: center; gap: 10px;
@@ -184,6 +207,15 @@
     }
     .btn-join:hover { background:rgba(255,255,255,0.16); }
 
+    .theme-toggle-home {
+      position: absolute; top: 20px; right: 20px;
+      background: var(--input-bg); border: 1px solid var(--input-border);
+      border-radius: 8px; cursor: pointer; padding: 6px;
+      color: var(--text-dim); transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .theme-toggle-home:hover { color: var(--text); }
+
     .error {
       color: rgba(255,80,80,0.8); font-size:12px;
       margin-top:8px; display:none;
@@ -191,10 +223,10 @@
 
     .footer-note {
       margin-top: 28px; font-size: 11px;
-      color: rgba(255,255,255,0.15);
+      color: var(--text-dim);
       letter-spacing: 0.02em;
     }
-    .footer-note span { color: rgba(255,255,255,0.3); }
+    .footer-note span { color: var(--text-dim); }
 
     /* ── RIGHT COLUMN — ROOM PREVIEW ── */
     .right {
@@ -206,9 +238,9 @@
     }
 
     .preview-card {
-      background: rgba(255,255,255,0.04);
+      background: var(--card-bg);
       backdrop-filter: blur(20px);
-      border: 1px solid rgba(255,255,255,0.08);
+      border: 1px solid var(--card-border);
       border-radius: 20px;
       padding: 28px;
       width: 100%;
@@ -311,7 +343,7 @@
     .platform-tag {
       padding: 3px 10px; border-radius: 20px;
       border: 1px solid rgba(255,255,255,0.1);
-      color: rgba(255,255,255,0.3);
+      color: var(--text-dim);
     }
   </style>
 </head>
@@ -442,6 +474,23 @@
     document.getElementById('join-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') joinRoom();
     });
+
+    let isDark = true;
+    function toggleTheme() {
+      isDark = !isDark;
+      document.documentElement.classList.toggle('light', !isDark);
+      localStorage.setItem('wl-theme', isDark ? 'dark' : 'light');
+      const icon = document.getElementById('theme-icon');
+      if(isDark) {
+        icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+      } else {
+        icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+      }
+    }
+    (function(){
+      const saved = localStorage.getItem('wl-theme');
+      if(saved === 'light') { isDark = false; document.documentElement.classList.add('light'); const icon = document.getElementById('theme-icon'); if(icon) icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'; }
+    })();
 
     function joinRoom() {
       const raw = document.getElementById('join-input').value.trim();
