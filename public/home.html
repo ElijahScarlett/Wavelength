@@ -89,10 +89,10 @@
       margin-bottom: 20px;
     }
     .headline .ghost {
-      -webkit-text-stroke: 1px rgba(255,255,255,0.3);
+      -webkit-text-stroke: 1px var(--border);
       color: transparent;
     }
-    .headline .solid { color: #fff; }
+    .headline .solid { color: var(--text); }
 
     .tagline {
       font-size: 14px;
@@ -126,7 +126,7 @@
       border: 1px solid var(--input-border);
       border-radius: 13px;
       padding: 15px 18px;
-      color: #fff;
+      color: var(--text);
       font-size: 14px;
       outline: none;
       transition: border-color 0.2s, background 0.2s;
@@ -134,9 +134,9 @@
     }
     .input:focus {
       border-color: rgba(29,185,84,0.4);
-      background: rgba(255,255,255,0.06);
+      background: var(--input-bg);
     }
-    .input::placeholder { color: rgba(0,0,0,0.25); }
+    .input::placeholder { color: var(--text-dim); }
 
     .private-toggle {
       display: flex; align-items: center; gap: 10px;
@@ -145,7 +145,7 @@
     }
     .toggle-switch {
       width: 36px; height: 20px;
-      background: rgba(255,255,255,0.1);
+      background: var(--border);
       border-radius: 10px;
       position: relative;
       transition: background 0.2s;
@@ -161,7 +161,7 @@
       transition: left 0.2s;
     }
     .toggle-switch.on::after { left: 19px; }
-    .toggle-label { font-size: 13px; color: rgba(255,255,255,0.45); }
+    .toggle-label { font-size: 13px; color: var(--text-dim); }
 
     .passcode-wrap { margin-bottom: 10px; display: none; }
 
@@ -189,23 +189,23 @@
 
     .divider-line {
       display:flex; align-items:center; gap:12px;
-      margin:16px 0 12px; color:rgba(255,255,255,0.18); font-size:11px;
+      margin:16px 0 12px; color:var(--text-dim); font-size:11px;
       letter-spacing:0.06em; text-transform:uppercase;
     }
     .divider-line::before,.divider-line::after {
-      content:''; flex:1; height:1px; background:rgba(255,255,255,0.08);
+      content:''; flex:1; height:1px; background:var(--border);
     }
     .join-row { display:flex; gap:8px; }
     .join-row .input { flex:1; margin-bottom:0; }
     .btn-join {
-      background:rgba(255,255,255,0.1); color:#fff;
-      border:1px solid rgba(255,255,255,0.15);
+      background:var(--input-bg); color:var(--text);
+      border:1px solid var(--input-border);
       border-radius:13px; padding:15px 18px;
       font-size:14px; font-weight:600; cursor:pointer;
       transition:all 0.2s; font-family:'DM Sans',sans-serif;
       white-space:nowrap; flex-shrink:0;
     }
-    .btn-join:hover { background:rgba(255,255,255,0.16); }
+    .btn-join:hover { background:var(--border); }
 
     .theme-toggle-home {
       position: absolute; top: 20px; right: 20px;
@@ -217,7 +217,7 @@
     .theme-toggle-home:hover { color: var(--text); }
 
     .error {
-      color: rgba(255,80,80,0.8); font-size:12px;
+      color: rgba(200,50,50,0.9); font-size:12px;
       margin-top:8px; display:none;
     }
 
@@ -254,7 +254,7 @@
     }
     .preview-room-name {
       font-family: 'Syne', sans-serif;
-      font-size: 15px; font-weight: 700; color: #fff;
+      font-size: 15px; font-weight: 700; color: var(--text);
     }
     .preview-members {
       display: flex; gap: 5px;
@@ -272,19 +272,19 @@
     .preview-art {
       width: 100%; aspect-ratio: 1;
       border-radius: 12px;
-      background: linear-gradient(135deg, rgba(29,185,84,0.15), rgba(80,40,160,0.15));
+      background: linear-gradient(135deg, rgba(29,185,84,0.12), rgba(80,40,160,0.1));
       margin-bottom: 16px;
       display: flex; align-items: center; justify-content: center;
       font-size: 48px; opacity: 0.4;
-      border: 1px solid rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
     }
 
     .preview-track { margin-bottom: 16px; }
     .preview-track-name {
       font-family: 'Syne', sans-serif;
-      font-size: 16px; font-weight: 700; color: #fff;
+      font-size: 16px; font-weight: 700; color: var(--text);
     }
-    .preview-track-artist { font-size: 12px; color: rgba(255,255,255,0.45); margin-top:3px; }
+    .preview-track-artist { font-size: 12px; color: var(--text-dim); margin-top:3px; }
 
     /* Diamond progress in preview */
     .preview-diamonds {
@@ -293,7 +293,7 @@
     }
     .preview-line {
       flex: 1; height: 1px;
-      background: rgba(255,255,255,0.1); position: relative;
+      background: var(--border); position: relative;
     }
     .preview-line-fill {
       position: absolute; top: 0; left: 0;
@@ -307,7 +307,7 @@
     }
     .preview-dmd {
       width: 7px; height: 7px; transform: rotate(45deg);
-      border: 1px solid rgba(255,255,255,0.2);
+      border: 1px solid var(--border);
       background: transparent;
     }
     .preview-dmd.lit { background: rgba(255,255,255,0.7); border-color: rgba(255,255,255,0.7); }
@@ -316,12 +316,12 @@
     .preview-queue { display:flex; flex-direction:column; gap:6px; }
     .preview-q-item {
       padding: 8px 12px; border-radius: 8px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.06);
-      font-size: 12px; color: rgba(255,255,255,0.5);
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      font-size: 12px; color: var(--text-dim);
       display: flex; align-items: center; gap: 8px;
     }
-    .preview-q-item.active-q { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85); }
+    .preview-q-item.active-q { background: var(--border); color: var(--text); }
     .preview-q-dot {
       width: 5px; height: 5px; border-radius: 50%;
       background: #1db954; flex-shrink:0;
