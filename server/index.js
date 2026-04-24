@@ -334,6 +334,14 @@ io.on('connection', socket => {
     io.to(roomId).emit('room:notify', { msg: grant ? `${target.name} can now control playback` : `${target.name}'s controls removed` });
   });
 
+  socket.on('chat:timeout', ({ roomId, name, duration }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    // Broadcast to room so the timed-out user gets disabled
+    io.to(roomId).emit('chat:timeout', { name, duration });
+  });
+
   socket.on('chat:message', ({ roomId, name, text }) => {
     if(!text||!name||!roomId) return;
     const safe = text.slice(0,300);
