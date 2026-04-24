@@ -30,6 +30,7 @@ const SPOTIFY_REDIRECT_URI  = process.env.SPOTIFY_REDIRECT_URI || 'https://wavel
 // ── Static routes ─────────────────────────────────────────
 app.get('/', (req, res) => res.sendFile(path.resolve(__dirname, '../public/home.html')));
 app.get('/room/:id', (req, res) => res.sendFile(path.resolve(__dirname, '../public/room.html')));
+app.get('/invite/:id', (req, res) => res.sendFile(path.resolve(__dirname, '../public/invite.html')));
 app.get('/health', (req, res) => res.json({ status: 'Wavelength running' }));
 
 // ── Spotify OAuth ─────────────────────────────────────────
@@ -129,7 +130,7 @@ app.get('/api/room/:id', async (req, res) => {
   const { data: room, error } = await supabase
     .from('rooms').select('*').eq('id', req.params.id).single();
   if (error) return res.status(404).json({ error: 'Room not found' });
-  res.json({ room });
+  res.json({ room, members: roomMembers[req.params.id] || {} });
 });
 
 app.post('/api/room/:id/verify', async (req, res) => {

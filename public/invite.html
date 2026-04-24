@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Join Room — Wavelength</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:#080a10; --text:#fff; --text-dim:rgba(255,255,255,0.5);
+  --border:rgba(255,255,255,0.08); --card:rgba(255,255,255,0.04);
+  --input-bg:rgba(255,255,255,0.06); --input-border:rgba(255,255,255,0.1);
+}
+html.light {
+  --bg:#f0f2f5; --text:#0d0f14; --text-dim:rgba(0,0,0,0.45);
+  --border:rgba(0,0,0,0.08); --card:rgba(255,255,255,0.8);
+  --input-bg:rgba(0,0,0,0.04); --input-border:rgba(0,0,0,0.1);
+}
+*{margin:0;padding:0;box-sizing:border-box;color:inherit;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;transition:background 0.3s;}
+
+/* Orbs */
+.orb{position:fixed;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0;}
+.orb1{width:500px;height:500px;background:rgba(29,185,84,0.06);top:-100px;left:-100px;}
+.orb2{width:400px;height:400px;background:rgba(80,40,160,0.07);bottom:-80px;right:-80px;}
+
+.wrap{position:relative;z-index:1;width:100%;max-width:420px;}
+
+/* Wordmark */
+.wordmark{font-family:'Syne',sans-serif;font-size:9px;letter-spacing:0.35em;text-transform:uppercase;color:#1db954;font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:28px;}
+.wordmark::before{content:'';width:5px;height:5px;background:#1db954;transform:rotate(45deg);display:inline-block;}
+
+/* Card */
+.card{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:32px;backdrop-filter:blur(20px);box-shadow:0 24px 64px rgba(0,0,0,0.3);}
+
+/* Album art */
+.art-wrap{width:100%;aspect-ratio:1;border-radius:16px;overflow:hidden;margin-bottom:20px;position:relative;background:rgba(255,255,255,0.04);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;}
+.art-wrap img{width:100%;height:100%;object-fit:cover;display:none;}
+.art-wrap.has-art img{display:block;}
+.art-placeholder{opacity:0.15;}
+
+/* Track info */
+.track-section{margin-bottom:20px;}
+.now-label{font-family:'Syne',sans-serif;font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:#1db954;font-weight:700;margin-bottom:6px;}
+.track-name{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;letter-spacing:-0.02em;line-height:1.1;margin-bottom:4px;}
+.track-artist{font-size:13px;color:var(--text-dim);}
+.nothing-playing{font-size:14px;color:var(--text-dim);padding:12px 0;}
+
+/* Progress bar */
+.progress-wrap{margin-bottom:20px;}
+.progress-line{height:2px;background:var(--border);border-radius:1px;overflow:hidden;margin-bottom:6px;}
+.progress-fill{height:100%;background:#1db954;border-radius:1px;width:0%;transition:width 0.5s linear;}
+.progress-times{display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);}
+
+/* Room info */
+.room-info{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border);}
+.room-name-big{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;}
+.members-row{display:flex;align-items:center;gap:6px;}
+.member-av{width:26px;height:26px;border-radius:50%;background:rgba(29,185,84,0.2);border:2px solid rgba(29,185,84,0.3);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#1db954;font-family:'Syne',sans-serif;margin-left:-6px;}
+.member-av:first-child{margin-left:0;}
+.member-count{font-size:11px;color:var(--text-dim);margin-left:4px;}
+
+/* Join form */
+.join-label{font-size:12px;color:var(--text-dim);margin-bottom:8px;}
+.join-input{width:100%;background:var(--input-bg);border:1px solid var(--input-border);border-radius:12px;padding:13px 16px;color:var(--text);font-size:15px;font-family:'DM Sans',sans-serif;outline:none;margin-bottom:10px;transition:border-color 0.2s;}
+.join-input:focus{border-color:rgba(29,185,84,0.5);}
+.join-input::placeholder{color:var(--text-dim);}
+.join-btn{width:100%;background:#1db954;color:#000;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:0.03em;transition:background 0.2s;text-transform:uppercase;}
+.join-btn:hover{background:#22e060;}
+.join-error{font-size:12px;color:rgba(220,60,60,0.9);margin-top:8px;display:none;}
+
+/* Passcode */
+.passcode-input{letter-spacing:0.5em;font-size:22px;text-align:center;}
+
+/* Loading state */
+.loading{text-align:center;padding:40px 0;color:var(--text-dim);font-size:13px;}
+.not-found{text-align:center;padding:40px 0;}
+.not-found h2{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-bottom:8px;}
+.not-found p{font-size:13px;color:var(--text-dim);margin-bottom:20px;}
+.back-btn{background:var(--input-bg);border:1px solid var(--input-border);color:var(--text);padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.2s;}
+.back-btn:hover{background:var(--border);}
+</style>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="wrap">
+  <div class="wordmark">Wavelength</div>
+  <div class="card" id="card">
+    <div class="loading" id="loading">Loading room...</div>
+  </div>
+</div>
+
+<script>
+const ROOM_ID = window.location.pathname.split('/').pop();
+let roomData = null;
+let stateData = null;
+let progressTimer = null;
+let elapsed = 0;
+let duration = 0;
+let needsPasscode = false;
+
+function fmt(s) { const m=Math.floor(s/60),sec=Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}`; }
+
+// Apply saved theme
+(function(){
+  if(localStorage.getItem('wl-theme')==='light') document.documentElement.classList.add('light');
+})();
+
+async function loadRoom() {
+  try {
+    const [roomRes, stateRes] = await Promise.all([
+      fetch(`/api/room/${ROOM_ID}`),
+      fetch(`/api/room/${ROOM_ID}/state`)
+    ]);
+    roomData = await roomRes.json();
+    stateData = await stateRes.json();
+    if(!roomData.room) { showNotFound(); return; }
+    needsPasscode = roomData.room.is_private;
+    render();
+  } catch(e) { showNotFound(); }
+}
+
+function render() {
+  const room = roomData.room;
+  const state = stateData;
+  const isPlaying = state && state.playing;
+
+  // Start progress ticker if playing
+  if(isPlaying) {
+    elapsed = state.elapsed || 0;
+    duration = state.duration || 240;
+    progressTimer = setInterval(() => {
+      elapsed++;
+      if(elapsed >= duration) { elapsed = duration; clearInterval(progressTimer); }
+      const pct = (elapsed/duration)*100;
+      const fill = document.getElementById('progress-fill');
+      const cur = document.getElementById('time-current');
+      if(fill) fill.style.width = pct+'%';
+      if(cur) cur.textContent = fmt(elapsed);
+    }, 1000);
+  }
+
+  const membersHtml = Object.values(roomData.members || {}).slice(0,5).map(m =>
+    `<div class="member-av" title="${m.name}">${m.name.charAt(0).toUpperCase()}</div>`
+  ).join('');
+  const memberCount = Object.values(roomData.members || {}).length;
+
+  const artHtml = isPlaying && state.image_url
+    ? `<div class="art-wrap has-art"><img src="${state.image_url}" alt=""/></div>`
+    : `<div class="art-wrap"><svg class="art-placeholder" width="56" height="56" viewBox="0 0 24 24" fill="none"><path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.5"/><circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="1.5"/></svg></div>`;
+
+  const trackHtml = isPlaying
+    ? `<div class="track-section">
+        <div class="now-label">Now Playing</div>
+        <div class="track-name">${state.track_name}</div>
+        <div class="track-artist">${state.artist_name}</div>
+       </div>
+       <div class="progress-wrap">
+         <div class="progress-line"><div class="progress-fill" id="progress-fill" style="width:${(elapsed/duration)*100}%"></div></div>
+         <div class="progress-times"><span id="time-current">${fmt(elapsed)}</span><span>${fmt(duration)}</span></div>
+       </div>`
+    : `<div class="track-section"><div class="nothing-playing">No song playing yet</div></div>`;
+
+  const joinForm = needsPasscode
+    ? `<div class="join-label">This room is private — enter the passcode</div>
+       <input class="join-input passcode-input" id="passcode-input" type="text" inputmode="numeric" maxlength="4" placeholder="····" autocomplete="off"/>
+       <input class="join-input" id="name-input" type="text" maxlength="20" placeholder="Your name..." autocomplete="off" style="margin-top:0;"/>
+       <button class="join-btn" onclick="joinRoom()">Join Room</button>
+       <div class="join-error" id="join-error"></div>`
+    : `<div class="join-label">Enter your name to join</div>
+       <input class="join-input" id="name-input" type="text" maxlength="20" placeholder="Your name..." autocomplete="off"/>
+       <button class="join-btn" onclick="joinRoom()">Join Room</button>
+       <div class="join-error" id="join-error"></div>`;
+
+  document.getElementById('card').innerHTML = `
+    ${artHtml}
+    <div class="room-info">
+      <div class="room-name-big">${room.name}</div>
+      <div class="members-row">
+        ${membersHtml}
+        ${memberCount > 0 ? `<span class="member-count">${memberCount} listening</span>` : '<span class="member-count">Be the first</span>'}
+      </div>
+    </div>
+    ${trackHtml}
+    ${joinForm}
+  `;
+
+  // Focus name input
+  setTimeout(() => {
+    const ni = document.getElementById('name-input');
+    if(ni) ni.focus();
+    if(document.getElementById('name-input')) {
+      document.getElementById('name-input').addEventListener('keydown', e => { if(e.key==='Enter') joinRoom(); });
+    }
+    if(document.getElementById('passcode-input')) {
+      document.getElementById('passcode-input').addEventListener('input', function(){ this.value=this.value.replace(/\D/g,'').slice(0,4); });
+    }
+  }, 100);
+}
+
+async function joinRoom() {
+  const nameInput = document.getElementById('name-input');
+  const name = nameInput ? nameInput.value.trim() : '';
+  const err = document.getElementById('join-error');
+
+  if(!name) { nameInput.focus(); return; }
+
+  if(needsPasscode) {
+    const passcode = document.getElementById('passcode-input').value;
+    if(passcode.length !== 4) {
+      err.textContent = 'Enter the 4-digit passcode.';
+      err.style.display = 'block'; return;
+    }
+    const r = await fetch(`/api/room/${ROOM_ID}/verify`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({passcode})
+    });
+    const d = await r.json();
+    if(!d.valid) {
+      err.textContent = 'Wrong passcode. Try again.';
+      err.style.display = 'block';
+      document.getElementById('passcode-input').value = '';
+      document.getElementById('passcode-input').focus();
+      return;
+    }
+  }
+
+  // Go to room with name pre-filled via URL param
+  window.location.href = `/room/${ROOM_ID}?name=${encodeURIComponent(name)}`;
+}
+
+function showNotFound() {
+  document.getElementById('card').innerHTML = `
+    <div class="not-found">
+      <h2>Room not found</h2>
+      <p>This room may have expired or the link is invalid.</p>
+      <button class="back-btn" onclick="window.location.href='/'">Back to Wavelength</button>
+    </div>`;
+}
+
+loadRoom();
+</script>
+</body>
+</html>
