@@ -334,6 +334,12 @@ io.on('connection', socket => {
     io.to(roomId).emit('room:notify', { msg: grant ? `${target.name} can now control playback` : `${target.name}'s controls removed` });
   });
 
+  socket.on('chat:message', ({ roomId, name, text }) => {
+    if(!text||!name||!roomId) return;
+    const safe = text.slice(0,300);
+    io.to(roomId).emit('chat:message', { name, text:safe, time:Date.now() });
+  });
+
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
     if (roomId && roomMembers[roomId]) {
