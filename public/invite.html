@@ -131,15 +131,18 @@ function render() {
   if(isPlaying) {
     elapsed = state.elapsed || 0;
     duration = state.duration || 240;
-    progressTimer = setInterval(() => {
-      elapsed++;
-      if(elapsed >= duration) { elapsed = duration; clearInterval(progressTimer); }
-      const pct = (elapsed/duration)*100;
-      const fill = document.getElementById('progress-fill');
-      const cur = document.getElementById('time-current');
-      if(fill) fill.style.width = pct+'%';
-      if(cur) cur.textContent = fmt(elapsed);
-    }, 1000);
+    const paused = state.is_paused || false;
+    if(!paused) {
+      progressTimer = setInterval(() => {
+        elapsed++;
+        if(elapsed >= duration) { elapsed = duration; clearInterval(progressTimer); }
+        const pct = (elapsed/duration)*100;
+        const fill = document.getElementById('progress-fill');
+        const cur = document.getElementById('time-current');
+        if(fill) fill.style.width = pct+'%';
+        if(cur) cur.textContent = fmt(elapsed);
+      }, 1000);
+    }
   }
 
   const membersHtml = Object.values(roomData.members || {}).slice(0,5).map(m =>
