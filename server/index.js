@@ -66,7 +66,33 @@ app.get('/callback', async (req, res) => {
   }
 });
 
-// ── Spotify search proxy ──────────────────────────────────
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+
+// YouTube search proxy
+app.get('/youtube/search', async (req, res) => {
+  const { query } = req.query;
+  if (!query) return res.status(400).json({ error: 'Missing query' });
+  if (!YOUTUBE_API_KEY) return res.status(500).json({ error: 'YouTube API not configured' });
+  try {
+    const r = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults=10&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}`
+    );
+    const data = await r.json();
+    if (data.error) return res.status(400).json({ error: data.error.message });
+    const tracks = data.items.map(item => ({
+      id:       item.id.videoId,
+      name:     item.snippet.title,
+      artist:   item.snippet.channelTitle,
+      image:    item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
+      duration: 0, // YouTube search doesn't return duration — fetched on play
+      platform: 'youtube'
+    }));
+    res.json({ tracks });
+  } catch(e) {
+    console.error('YouTube search error:', e);
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
 app.get('/spotify/search', async (req, res) => {
   const { query, access_token } = req.query;
   if (!query || !access_token) return res.status(400).json({ error: 'Missing query or token' });
@@ -165,7 +191,8 @@ async function saveRoomState(roomId, state) {
       track_name:    state.track_name,
       artist_name:   state.artist_name,
       image_url:     state.image_url,
-      spotify_uri:   state.spotify_uri,
+      spotify_uri:   state.spotify_uri || null,
+      youtube_id:    state.youtube_id || null,
       duration:      state.duration,
       elapsed:       state.elapsed_at_start,
       is_paused:     state.is_paused || false,
@@ -241,10 +268,10 @@ io.on('connection', socket => {
     io.to(roomId).emit('member:update', roomMembers[roomId]);
   });
 
-  socket.on('playback:started', ({ roomId, track_name, artist_name, image_url, spotify_uri, duration, elapsed, live_queue }) => {
+  socket.on('playback:started', ({ roomId, track_name, artist_name, image_url, spotify_uri, youtube_id, duration, elapsed, live_queue }) => {
     if (!roomState[roomId]) roomState[roomId] = {};
     Object.assign(roomState[roomId], {
-      track_name, artist_name, image_url, spotify_uri, duration,
+      track_name, artist_name, image_url, spotify_uri, youtube_id, duration,
       elapsed_at_start: elapsed || 0,
       started_at: Date.now(),
       is_paused: false,
@@ -252,7 +279,7 @@ io.on('connection', socket => {
     });
     saveRoomState(roomId, roomState[roomId]);
     socket.to(roomId).emit('playback:sync', {
-      track_name, artist_name, image_url, spotify_uri, duration,
+      track_name, artist_name, image_url, spotify_uri, youtube_id, duration,
       elapsed: elapsed || 0, server_ts: Date.now(),
       live_queue: live_queue || []
     });
