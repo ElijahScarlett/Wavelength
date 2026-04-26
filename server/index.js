@@ -366,6 +366,54 @@ io.on('connection', socket => {
 
   // Vote skip
   const roomSkipVotes = {};
+  socket.on('chat:pin', ({ roomId, text }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    io.to(roomId).emit('chat:pinned', { text });
+  });
+  socket.on('chat:clear', ({ roomId }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    io.to(roomId).emit('chat:cleared');
+  });
+  socket.on('chat:readonly', ({ roomId, enabled }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    io.to(roomId).emit('chat:readonly', { enabled });
+  });
+  socket.on('chat:slowmode', ({ roomId, secs }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    io.to(roomId).emit('chat:slowmode', { secs });
+  });
+  socket.on('chat:blacklist', ({ roomId, list }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    io.to(roomId).emit('chat:blacklist', { list });
+  });
+  socket.on('chat:mute', ({ roomId, name, muted }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    const target = Object.entries(roomMembers[roomId]).find(([,m])=>m.name===name);
+    if(target) roomMembers[roomId][target[0]].muted = muted;
+    io.to(roomId).emit('chat:muted', { name, muted });
+  });
+  socket.on('chat:ban', ({ roomId, name }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    const target = Object.entries(roomMembers[roomId]).find(([,m])=>m.name===name);
+    if(target) { delete roomMembers[roomId][target[0]]; io.to(roomId).emit('member:update', roomMembers[roomId]); }
+    io.to(roomId).emit('chat:banned', { name });
+    io.to(roomId).emit('room:notify', { msg: `${name} was removed from the room` });
+  });
+
   socket.on('host:chat:disable', ({ roomId, disabled }) => {
     if(!roomMembers[roomId]) return;
     const me = roomMembers[roomId][socket.id];
@@ -410,8 +458,19 @@ io.on('connection', socket => {
 
   socket.on('chat:message', ({ roomId, name, text }) => {
     if(!text||!name||!roomId) return;
-    const safe = text.slice(0,300);
-    io.to(roomId).emit('chat:message', { name, text:safe, time:Date.now() });
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    // Block muted users
+    if(me?.muted) return;
+    // Block read-only for non-hosts
+    if(roomState[roomId]?.chatReadOnly && !me?.isHost && !me?.isCoHost) return;
+    let safe = text.slice(0,300);
+    // Server-side blacklist filter
+    const blacklist = roomState[roomId]?.blacklist || [];
+    blacklist.forEach(w => {
+      safe = safe.replace(new RegExp(w, 'gi'), '*'.repeat(w.length));
+    });
+    io.to(roomId).emit('chat:message', { name, text: safe, time: Date.now() });
   });
 
   socket.on('disconnect', () => {
