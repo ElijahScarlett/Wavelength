@@ -79,14 +79,17 @@ app.get('/youtube/search', async (req, res) => {
     );
     const data = await r.json();
     if (data.error) return res.status(400).json({ error: data.error.message });
-    const tracks = data.items.map(item => ({
-      id:       item.id.videoId,
-      name:     item.snippet.title,
-      artist:   item.snippet.channelTitle,
-      image:    item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
-      duration: 0, // YouTube search doesn't return duration — fetched on play
-      platform: 'youtube'
-    }));
+    const tracks = data.items.map(item => {
+      const vid = item.id.videoId;
+      return {
+        id:       vid,
+        name:     item.snippet.title,
+        artist:   item.snippet.channelTitle,
+        image:    `https://i.ytimg.com/vi/${vid}/maxresdefault.jpg`,
+        duration: 0,
+        platform: 'youtube'
+      };
+    });
     res.json({ tracks });
   } catch(e) {
     console.error('YouTube search error:', e);
@@ -359,6 +362,13 @@ io.on('connection', socket => {
     target.canControl = grant;
     io.to(roomId).emit('member:update', roomMembers[roomId]);
     io.to(roomId).emit('room:notify', { msg: grant ? `${target.name} can now control playback` : `${target.name}'s controls removed` });
+  });
+
+  socket.on('chat:delete', ({ roomId, msgIndex }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    io.to(roomId).emit('chat:delete', { msgIndex });
   });
 
   socket.on('chat:timeout', ({ roomId, name, duration }) => {
