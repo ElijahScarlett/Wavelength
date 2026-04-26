@@ -75,7 +75,7 @@ app.get('/youtube/search', async (req, res) => {
   if (!YOUTUBE_API_KEY) return res.status(500).json({ error: 'YouTube API not configured' });
   try {
     const r = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults=10&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}`
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults=10&q=${encodeURIComponent(query + ' official audio lyrics')}&key=${YOUTUBE_API_KEY}`
     );
     const data = await r.json();
     if (data.error) return res.status(400).json({ error: data.error.message });
