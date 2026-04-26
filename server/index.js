@@ -366,6 +366,13 @@ io.on('connection', socket => {
 
   // Vote skip
   const roomSkipVotes = {};
+  socket.on('host:chat:disable', ({ roomId, disabled }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    io.to(roomId).emit('chat:disabled', { disabled });
+  });
+
   socket.on('vote:skip', ({ roomId, vote }) => {
     if (!roomSkipVotes[roomId]) roomSkipVotes[roomId] = new Set();
     if(vote) roomSkipVotes[roomId].add(socket.id);
