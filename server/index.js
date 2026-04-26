@@ -364,6 +364,28 @@ io.on('connection', socket => {
     io.to(roomId).emit('room:notify', { msg: grant ? `${target.name} can now control playback` : `${target.name}'s controls removed` });
   });
 
+  // Vote skip
+  const roomSkipVotes = {};
+  socket.on('vote:skip', ({ roomId, vote }) => {
+    if (!roomSkipVotes[roomId]) roomSkipVotes[roomId] = new Set();
+    if(vote) roomSkipVotes[roomId].add(socket.id);
+    else roomSkipVotes[roomId].delete(socket.id);
+    const memberCount = Object.keys(roomMembers[roomId] || {}).length;
+    const voteCount = roomSkipVotes[roomId].size;
+    const threshold = Math.ceil(memberCount * 0.5); // 50% majority
+    io.to(roomId).emit('vote:skip:update', {
+      count: voteCount,
+      total: memberCount,
+      shouldSkip: voteCount >= threshold && voteCount >= 2
+    });
+  });
+
+  socket.on('vote:skip:clear', ({ roomId }) => {
+    if(roomSkipVotes[roomId]) roomSkipVotes[roomId].clear();
+    const memberCount = Object.keys(roomMembers[roomId] || {}).length;
+    io.to(roomId).emit('vote:skip:update', { count: 0, total: memberCount, shouldSkip: false });
+  });
+
   socket.on('chat:delete', ({ roomId, msgIndex }) => {
     if(!roomMembers[roomId]) return;
     const me = roomMembers[roomId][socket.id];
