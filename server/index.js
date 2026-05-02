@@ -419,6 +419,22 @@ io.on('connection', socket => {
     const me = roomMembers[roomId][socket.id];
     if(!me?.isHost && !me?.isCoHost) return;
     io.to(roomId).emit('chat:disabled', { disabled });
+    io.to(roomId).emit('room:notify', { msg: `${me.name} ${disabled ? 'disabled' : 'enabled'} chat` });
+  });
+
+  socket.on('host:broadcast', ({ roomId, msg }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    if(!msg) return;
+    io.to(roomId).emit('room:notify', { msg: `📢 ` });
+  });
+
+  socket.on('queue:cleared', ({ roomId }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me) return;
+    io.to(roomId).emit('room:notify', { msg: `${me.name} cleared the queue` });
   });
 
   socket.on('vote:skip', ({ roomId, vote }) => {
