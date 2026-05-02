@@ -472,6 +472,13 @@ io.on('connection', socket => {
     io.to(roomId).emit('chat:timeout', { name, duration });
   });
 
+  socket.on('chat:timeout:cancel', ({ roomId, name }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    io.to(roomId).emit('chat:timeout:cancel', { name });
+  });
+
   socket.on('chat:style', ({ roomId, name, glow, rainbow, color }) => {
     if (!roomMembers[roomId]) return;
     const me = roomMembers[roomId][socket.id];
