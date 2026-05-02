@@ -1,4 +1,4 @@
-// server/index.js
+﻿// server/index.js
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 
 const express = require('express');
@@ -410,8 +410,8 @@ io.on('connection', socket => {
     if(!me?.isHost && !me?.isCoHost) return;
     const target = Object.entries(roomMembers[roomId]).find(([,m])=>m.name===name);
     if(target) { delete roomMembers[roomId][target[0]]; io.to(roomId).emit('member:update', roomMembers[roomId]); }
-    io.to(roomId).emit('chat:banned', { name });
-    io.to(roomId).emit('room:notify', { msg: `${name} was removed from the room` });
+    io.to(roomId).emit('chat:banned', { name, reason: '' });
+    io.to(roomId).emit('room:notify', { msg: `${me.name} removed ${name} from the room` });
   });
 
   socket.on('host:chat:disable', ({ roomId, disabled }) => {
@@ -454,6 +454,13 @@ io.on('connection', socket => {
     if(!me?.isHost && !me?.isCoHost) return;
     // Broadcast to room so the timed-out user gets disabled
     io.to(roomId).emit('chat:timeout', { name, duration });
+  });
+
+  socket.on('chat:style', ({ roomId, name, glow, rainbow, color }) => {
+    if (!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if (!me || me.name !== name) return;
+    io.to(roomId).emit('chat:style', { name, glow, rainbow, color });
   });
 
   socket.on('chat:message', ({ roomId, name, text }) => {
