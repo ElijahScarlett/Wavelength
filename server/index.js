@@ -404,13 +404,13 @@ io.on('connection', socket => {
     if(target) roomMembers[roomId][target[0]].muted = muted;
     io.to(roomId).emit('chat:muted', { name, muted });
   });
-  socket.on('chat:ban', ({ roomId, name }) => {
+  socket.on('chat:ban', ({ roomId, name, reason }) => {
     if(!roomMembers[roomId]) return;
     const me = roomMembers[roomId][socket.id];
     if(!me?.isHost && !me?.isCoHost) return;
     const target = Object.entries(roomMembers[roomId]).find(([,m])=>m.name===name);
     if(target) { delete roomMembers[roomId][target[0]]; io.to(roomId).emit('member:update', roomMembers[roomId]); }
-    io.to(roomId).emit('chat:banned', { name, reason: '' });
+    io.to(roomId).emit('chat:banned', { name, reason: (reason||'').slice(0,80) });
     io.to(roomId).emit('room:notify', { msg: `${me.name} removed ${name} from the room` });
   });
 
