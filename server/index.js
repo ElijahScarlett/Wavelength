@@ -244,7 +244,8 @@ app.get('/api/room/:id/state', async (req, res) => {
     duration:    state.duration,
     elapsed,
     is_paused:   state.is_paused || false,
-    live_queue:  state.live_queue || []
+    live_queue:  state.live_queue || [],
+    server_ts:   Date.now()
   });
 });
 
@@ -394,6 +395,8 @@ io.on('connection', socket => {
     if(!roomMembers[roomId]) return;
     const me = roomMembers[roomId][socket.id];
     if(!me?.isHost && !me?.isCoHost) return;
+    if(!roomState[roomId]) roomState[roomId] = {};
+    roomState[roomId].blacklist = list;
     io.to(roomId).emit('chat:blacklist', { list });
   });
   socket.on('chat:mute', ({ roomId, name, muted }) => {
@@ -427,7 +430,15 @@ io.on('connection', socket => {
     const me = roomMembers[roomId][socket.id];
     if(!me?.isHost && !me?.isCoHost) return;
     if(!msg) return;
-    io.to(roomId).emit('room:notify', { msg: `📢 ` });
+    io.to(roomId).emit('room:notify', { msg: `📢 ${msg}` });
+  });
+
+  socket.on('bg:broadcast', ({ roomId, dataUrl }) => {
+    if(!roomMembers[roomId]) return;
+    const me = roomMembers[roomId][socket.id];
+    if(!me?.isHost && !me?.isCoHost) return;
+    if(!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return;
+    socket.to(roomId).emit('bg:broadcast', { dataUrl });
   });
 
   socket.on('queue:cleared', ({ roomId }) => {
