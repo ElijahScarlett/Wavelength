@@ -1101,7 +1101,7 @@ function applyHostUI() {
 function togglePause() {
   if(_cooldown('pause',600)) return;
   if(!hasControl()){ showToast('Only the host can pause'); return; }
-  if(!nowPlaying||!spotifyToken) return;
+  if(!nowPlaying) return;
   isPaused=!isPaused; setPauseIcon(isPaused);
   if(activePlatform==='youtube'){ if(isPaused) pauseOnYouTube(); else resumeOnYouTube(); }
   else fetch(`https://api.spotify.com/v1/me/player/${isPaused?'pause':'play'}`,{
@@ -1323,9 +1323,9 @@ socket.on('playback:sync',state=>{
       }
       // Same platform or Spotify user
       else {
-        const _sameTrack = nowPlaying && (nowPlaying.uri === syncId);
-        const _inSync = _sameTrack && Math.abs(correctedSec - elapsedSeconds) < 2;
-        if(!_inSync) playTrack(syncId, Math.floor(correctedMs));
+        window._pendingSync = state;
+        const _canPlay = (activePlatform==='youtube' && ytArmed) || (activePlatform==='spotify' && spotifyToken);
+        if(_canPlay){ playTrack(syncId, Math.floor(correctedMs)); window._pendingSync=null; }
       }
     }, 400);
   }
@@ -1716,10 +1716,10 @@ function fetchRoomState() {
     startProgress(state.duration, state.elapsed, state.is_paused);
     const joinId=state.youtube_id||state.spotify_uri;
     if(joinId){
-      const _sameTrack = nowPlaying && nowPlaying.uri === joinId;
-      const _inSync = _sameTrack && Math.abs(state.elapsed - elapsedSeconds) < 2;
-      if(!_inSync) playTrack(joinId, state.elapsed*1000);
-    } else { window._pendingSync=state; }
+      window._pendingSync = state;
+      const _canPlay = (activePlatform==='youtube' && ytArmed) || (activePlatform==='spotify' && spotifyToken);
+      if(_canPlay){ playTrack(joinId, state.elapsed*1000); window._pendingSync=null; }
+    }
     fetchLyrics(state.track_name,state.artist_name);
   }).catch(()=>{});
 }
@@ -1793,7 +1793,7 @@ function armYouTube() {
         startYouTubeSync();
       },
       onStateChange: function(e) {
-        if(e.data===0 && activePlatform==='youtube') setTimeout(()=>autoPlayNext(),1200);
+        if(e.data===0 && activePlatform==='youtube' && hasControl()) setTimeout(()=>autoPlayNext(),1200);
       },
       onError: function(e) { console.warn('YT error:', e.data); }
     }
@@ -1917,7 +1917,7 @@ document.getElementById('song-input').addEventListener('keydown',e=>{ if(e.key==
 function showResults(tracks) {
   const res=document.getElementById('search-results'); res.style.display='block';
   res.innerHTML=tracks.map(t=>`
-    <div class="sr-item" onclick="selectSong('${t.uri}','${t.name.replace(/'/g,"\\'")}','${t.artist.replace(/'/g,"\\'")}','${t.image||''}',${t.duration||240})">
+    <div class="sr-item" onclick="selectSong('${t.uri||t.id}','${t.name.replace(/'/g,"\\'")}','${t.artist.replace(/'/g,"\\'")}','${t.image||''}',${t.duration||240})">
       ${t.image?`<img class="sr-img" src="${t.image}">`:'<div class="sr-img"></div>'}
       <div><div class="sr-name">${t.name}</div><div class="sr-artist">${t.artist}</div></div>
     </div>`).join('');
