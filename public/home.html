@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script>(function(){if(localStorage.getItem('wl-theme')==='light')document.documentElement.classList.add('light');})()</script>
+  <script>(function(){var t=localStorage.getItem('wl-theme');if(t==='light'){document.documentElement.classList.add('light');}else{document.documentElement.classList.remove('light');if(!t)localStorage.setItem('wl-theme','dark');}})()</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wavelength</title>
@@ -490,7 +490,16 @@
     }
     (function(){
       const saved = localStorage.getItem('wl-theme');
-      if(saved === 'light') { isDark = false; document.documentElement.classList.add('light'); const icon = document.getElementById('theme-icon'); if(icon) icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'; }
+      if(saved === 'light') {
+        isDark = false;
+        document.documentElement.classList.add('light');
+        const icon = document.getElementById('theme-icon');
+        if(icon) icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+      } else {
+        isDark = true;
+        document.documentElement.classList.remove('light');
+        if(!saved) localStorage.setItem('wl-theme', 'dark');
+      }
     })();
 
     function joinRoom() {

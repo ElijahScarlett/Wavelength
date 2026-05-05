@@ -220,6 +220,7 @@ app.get('/api/room/:id/state', async (req, res) => {
           artist_name:      data.artist_name,
           image_url:        data.image_url,
           spotify_uri:      data.spotify_uri,
+          youtube_id:       data.youtube_id || null,
           duration:         data.duration,
           elapsed_at_start: data.elapsed,
           started_at:       Date.now(),
@@ -241,10 +242,13 @@ app.get('/api/room/:id/state', async (req, res) => {
     artist_name: state.artist_name,
     image_url:   state.image_url,
     spotify_uri: state.spotify_uri,
+    youtube_id:  state.youtube_id || null,
     duration:    state.duration,
     elapsed,
     is_paused:   state.is_paused || false,
     live_queue:  state.live_queue || [],
+    slow_mode:   state.slowMode || 0,
+    blacklist:   state.blacklist || [],
     server_ts:   Date.now()
   });
 });
@@ -389,6 +393,8 @@ io.on('connection', socket => {
     if(!roomMembers[roomId]) return;
     const me = roomMembers[roomId][socket.id];
     if(!me?.isHost && !me?.isCoHost) return;
+    if(!roomState[roomId]) roomState[roomId] = {};
+    roomState[roomId].slowMode = secs || 0;
     io.to(roomId).emit('chat:slowmode', { secs });
   });
   socket.on('chat:blacklist', ({ roomId, list }) => {
@@ -430,13 +436,15 @@ io.on('connection', socket => {
     const me = roomMembers[roomId][socket.id];
     if(!me?.isHost && !me?.isCoHost) return;
     if(!msg) return;
-    io.to(roomId).emit('room:notify', { msg: `📢 ${msg}` });
+    io.to(roomId).emit('room:notify', { msg });
+    // Also send as a chat message so it's visible in the chat panel
+    io.to(roomId).emit('chat:message', { name: me.name, text: msg, time: Date.now(), isBroadcast: true });
   });
 
   socket.on('bg:broadcast', ({ roomId, dataUrl }) => {
     if(!roomMembers[roomId]) return;
     const me = roomMembers[roomId][socket.id];
-    if(!me?.isHost && !me?.isCoHost) return;
+    if(!me) return; // must be a joined member
     if(!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return;
     socket.to(roomId).emit('bg:broadcast', { dataUrl });
   });
@@ -497,6 +505,9 @@ io.on('connection', socket => {
     io.to(roomId).emit('chat:style', { name, glow, rainbow, color });
   });
 
+  // Per-socket slow mode timestamp tracking
+  const _lastMsgTime = {};
+
   socket.on('chat:message', ({ roomId, name, text }) => {
     if(!text||!name||!roomId) return;
     if(!roomMembers[roomId]) return;
@@ -505,11 +516,22 @@ io.on('connection', socket => {
     if(me?.muted) return;
     // Block read-only for non-hosts
     if(roomState[roomId]?.chatReadOnly && !me?.isHost && !me?.isCoHost) return;
+    // Enforce slow mode (skip for host/co-host)
+    if(!me?.isHost && !me?.isCoHost) {
+      const slowSecs = roomState[roomId]?.slowMode || 0;
+      if(slowSecs > 0) {
+        const now = Date.now();
+        const last = _lastMsgTime[roomId] || 0;
+        if(now - last < slowSecs * 1000) return; // silently drop — client already shows warning
+        _lastMsgTime[roomId] = now;
+      }
+    }
     let safe = text.slice(0,300);
     // Server-side blacklist filter
     const blacklist = roomState[roomId]?.blacklist || [];
     blacklist.forEach(w => {
-      safe = safe.replace(new RegExp(w, 'gi'), '*'.repeat(w.length));
+      const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      safe = safe.replace(new RegExp(escaped, 'gi'), '*'.repeat(w.length));
     });
     io.to(roomId).emit('chat:message', { name, text: safe, time: Date.now() });
   });

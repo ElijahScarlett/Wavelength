@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-<script>(function(){if(localStorage.getItem('wl-theme')==='light')document.documentElement.classList.add('light');})()</script>
+<script>(function(){var t=localStorage.getItem('wl-theme');if(t==='light'){document.documentElement.classList.add('light');}else{document.documentElement.classList.remove('light');if(!t)localStorage.setItem('wl-theme','dark');}})()</script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Wavelength</title>
@@ -240,7 +240,7 @@ html.bg-blur .bg-canvas { filter:blur(60px) saturate(1.4); transform:scale(1.15)
 .artist-name { font-size:13px; color:var(--text-dim); cursor:pointer; }
 .artist-name:hover { color:var(--text); text-decoration:underline; }
 .artist-popup { position:fixed; inset:0; z-index:3000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.7); }
-.artist-popup-card { background:var(--bg-panel); border:1px solid var(--border); border-radius:18px; padding:24px; width:min(380px,92vw); max-height:80vh; overflow-y:auto; position:relative; }
+.artist-popup-card { background:var(--bg-panel); border:1px solid var(--border); border-radius:18px; padding:24px; width:min(380px,92vw); max-height:min(600px,85vh); overflow-y:auto; position:relative; }
 .artist-popup-title { font-size:16px; font-weight:700; margin-bottom:16px; color:var(--text); }
 .artist-popup-close { position:absolute; top:14px; right:14px; background:none; border:none; color:var(--text-dim); font-size:20px; cursor:pointer; line-height:1; }
 .artist-track-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; cursor:pointer; transition:background 0.12s; }
@@ -288,8 +288,8 @@ html.bg-blur .bg-canvas { filter:blur(60px) saturate(1.4); transform:scale(1.15)
 .lyrics-resize-handle.visible { display:block; }
 .lyrics-resize-handle:hover,.lyrics-resize-handle.dragging { background:rgba(29,185,84,0.3); }
 .lyrics-resize-handle::after { content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:2px; height:40px; border-radius:2px; background:var(--border); }
-.lyrics-col { position:absolute; right:0; top:0; bottom:0; width:0; overflow:hidden; transition:width 0.4s ease, right 0.4s ease; border-left:1px solid transparent; display:flex; flex-direction:column; background:var(--bg-panel); z-index:25; }
-.lyrics-col.open { width:280px; border-left-color:var(--border); }
+.lyrics-col { width:0; flex-shrink:0; overflow:hidden; transition:width 0.4s ease; border-left:1px solid transparent; display:flex; flex-direction:column; background:var(--bg-panel); }
+.lyrics-col.open { width:280px; border-left-color:var(--border); overflow:unset; }
 .lyrics-header { padding:16px 18px 10px; font-family:'Syne',sans-serif; font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-dimmer); font-weight:700; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; }
 .lyrics-close { background:transparent; border:none; cursor:pointer; color:var(--text-dimmer); font-size:18px; line-height:1; transition:color 0.2s; padding:0 2px; }
 .lyrics-close:hover { color:var(--text); }
@@ -595,7 +595,7 @@ html.light .chat-col.popped { background:rgba(248,249,252,0.88) !important; }
     <div style="font-size:10px;color:var(--text-dim);margin-top:5px;">Drag to reposition. Image will be cropped to 16:9.</div>
     <div style="display:flex;gap:8px;margin-top:12px;">
       <button class="settings-slow-btn" onclick="cancelBgCrop()" style="flex:1;">Cancel</button>
-      <button class="settings-slow-btn" onclick="confirmBgCrop()" style="flex:1;background:var(--accent);color:#000;font-weight:600;">Use image</button>
+      <button class="settings-slow-btn" onclick="confirmBgCrop()" style="flex:1;background:#1db954;color:#000;font-weight:600;">Use image</button>
     </div>
   </div>
 </div>
@@ -826,7 +826,7 @@ html.light .chat-col.popped { background:rgba(248,249,252,0.88) !important; }
         </div>
         <!-- Pinned message slot -->
         <div id="chat-pinned" style="display:none;padding:8px 14px;background:rgba(29,185,84,0.08);border-bottom:1px solid rgba(29,185,84,0.2);font-size:12px;color:var(--text);flex-shrink:0;">
-          <span style="font-size:9px;font-weight:700;color:#1db954;text-transform:uppercase;letter-spacing:0.1em;margin-right:6px;">📌</span>
+          <span style="font-size:9px;font-weight:700;color:#1db954;text-transform:uppercase;letter-spacing:0.1em;margin-right:6px;">Pinned</span>
           <span id="chat-pinned-text"></span>
           <button id="chat-unpin-btn" onclick="window.unpinMessage()" style="display:none;float:right;background:none;border:none;cursor:pointer;color:var(--text-faint);font-size:12px;">×</button>
         </div>
@@ -917,6 +917,7 @@ let queue=[], history=[], nowPlaying=null;
 let spotifyToken=null;
 let activePlatform=null;
 let progressInterval=null, elapsedSeconds=0, totalSeconds=240;
+let _progressRefTime=0, _progressRefElapsed=0, _lyricsInterval=null;
 let isPaused=false, isMuted=false, lastVol=80;
 let restartClickCount=0, restartClickTimer=null;
 let members={}, myName='', dragSrcIdx=null, membersOpen=false, _memberHistoryMode=false;
@@ -1029,26 +1030,41 @@ function updateAlbumArt(url) {
   }
 }
 
+// ── LYRICS SYNC ─────────────────────────────────────────
+function _getLyricsElapsed() {
+  if(isPaused) return _progressRefElapsed;
+  return _progressRefElapsed + (Date.now() - _progressRefTime) / 1000;
+}
+function _startLyricsSync() {
+  if(_lyricsInterval) clearInterval(_lyricsInterval);
+  _lyricsInterval = setInterval(() => {
+    if(lyricsOpen && lyricsLines.length) updateLyricsHighlight(_getLyricsElapsed());
+  }, 250);
+}
+
 // ── PROGRESS ────────────────────────────────────────────
 function startProgress(dur, from, startPaused) {
   if(progressInterval) clearInterval(progressInterval);
   elapsedSeconds=from||0; totalSeconds=dur||240;
+  _progressRefElapsed=from||0; _progressRefTime=Date.now();
   isPaused = startPaused || false;
   document.getElementById('time-total').textContent=fmt(totalSeconds);
   document.getElementById('time-current').textContent=fmt(elapsedSeconds);
   updateDiamonds((elapsedSeconds/totalSeconds)*100);
   setPauseIcon(isPaused);
+  _startLyricsSync();
   progressInterval=setInterval(()=>{
     if(isPaused) return;
     elapsedSeconds++;
+    _progressRefElapsed=elapsedSeconds; _progressRefTime=Date.now();
     if(elapsedSeconds>=totalSeconds){
       elapsedSeconds=totalSeconds; clearInterval(progressInterval); progressInterval=null;
+      if(_lyricsInterval){clearInterval(_lyricsInterval);_lyricsInterval=null;}
       updateDiamonds(100); document.getElementById('time-current').textContent=fmt(totalSeconds);
       setTimeout(()=>autoPlayNext(),1200); return;
     }
     updateDiamonds((elapsedSeconds/totalSeconds)*100);
     document.getElementById('time-current').textContent=fmt(elapsedSeconds);
-    if(lyricsOpen&&lyricsLines.length) updateLyricsHighlight(elapsedSeconds);
   },1000);
 }
 
@@ -1109,15 +1125,13 @@ function setVolume(val) {
 }
 (function(){
   const saved = localStorage.getItem('wl-volume');
-  if(saved !== null) {
-    const v = Math.min(100, Math.max(0, +saved));
-    lastVol = v;
-    const s = document.getElementById('vol-slider');
-    if(s) s.value = v;
-    const waves = document.getElementById('vol-waves');
-    if(waves) waves.style.display = v==0?'none':'';
-    if(s) s.classList.toggle('muted', v==0);
-  }
+  const v = saved !== null ? Math.min(100, Math.max(0, +saved)) : 80;
+  lastVol = v;
+  isMuted = v === 0;
+  const s = document.getElementById('vol-slider');
+  if(s){ s.value = v; s.classList.toggle('muted', v===0); }
+  const waves = document.getElementById('vol-waves');
+  if(waves) waves.style.display = v===0?'none':'';
 })();
 function toggleMute() {
   const s=document.getElementById('vol-slider');
@@ -1268,7 +1282,7 @@ socket.on('connect', () => {
       if(!state.playing) return;
       const lag = Date.now() - (state.server_ts || Date.now());
       const correctedMs = (state.elapsed * 1000) + lag;
-      nowPlaying={name:state.track_name,artist:state.artist_name,image:state.image_url,duration:state.duration,uri:state.spotify_uri};
+      nowPlaying={name:state.track_name,artist:state.artist_name,image:state.image_url,duration:state.duration,uri:state.youtube_id||state.spotify_uri};
       document.getElementById('np-title').textContent=state.track_name;
       document.getElementById('np-artist').textContent=state.artist_name;
       updateAlbumArt(state.image_url);
@@ -1286,7 +1300,7 @@ socket.on('playback:sync',state=>{
   const correctedSec = correctedMs / 1000;
   const indicator=document.getElementById('sync-indicator');
   indicator.classList.add('visible'); setTimeout(()=>indicator.classList.remove('visible'),3000);
-  nowPlaying={name:state.track_name,artist:state.artist_name,image:state.image_url,duration:state.duration,uri:state.spotify_uri};
+  nowPlaying={name:state.track_name,artist:state.artist_name,image:state.image_url,duration:state.duration,uri:state.youtube_id||state.spotify_uri};
   document.getElementById('np-title').textContent=state.track_name;
   document.getElementById('np-artist').textContent=state.artist_name;
   document.title=state.track_name+' — Wavelength';
@@ -1310,7 +1324,7 @@ socket.on('playback:sync',state=>{
       // Same platform or Spotify user
       else {
         const _sameTrack = nowPlaying && (nowPlaying.uri === syncId);
-        const _inSync = _sameTrack && Math.abs(correctedSec - elapsedSeconds) < 10;
+        const _inSync = _sameTrack && Math.abs(correctedSec - elapsedSeconds) < 2;
         if(!_inSync) playTrack(syncId, Math.floor(correctedMs));
       }
     }, 400);
@@ -1318,8 +1332,8 @@ socket.on('playback:sync',state=>{
   fetchLyrics(state.track_name,state.artist_name);
 });
 socket.on('queue:host_sync',({live_queue})=>{ queue=live_queue; renderQueue(); });
-socket.on('playback:paused',({elapsed})=>{ isPaused=true; elapsedSeconds=elapsed; setPauseIcon(true); if(activePlatform==='youtube') pauseOnYouTube(); else if(spotifyToken) fetch('https://api.spotify.com/v1/me/player/pause',{method:'PUT',headers:{Authorization:`Bearer ${spotifyToken}`}}).catch(()=>{}); });
-socket.on('playback:resumed',({elapsed})=>{ isPaused=false; elapsedSeconds=elapsed; setPauseIcon(false); if(activePlatform==='youtube') resumeOnYouTube(); else if(spotifyToken&&nowPlaying) fetch('https://api.spotify.com/v1/me/player/play',{method:'PUT',headers:{Authorization:`Bearer ${spotifyToken}`}}).catch(()=>{}); });
+socket.on('playback:paused',({elapsed})=>{ isPaused=true; elapsedSeconds=elapsed; _progressRefElapsed=elapsed; _progressRefTime=Date.now(); setPauseIcon(true); if(activePlatform==='youtube') pauseOnYouTube(); else if(spotifyToken) fetch('https://api.spotify.com/v1/me/player/pause',{method:'PUT',headers:{Authorization:`Bearer ${spotifyToken}`}}).catch(()=>{}); });
+socket.on('playback:resumed',({elapsed})=>{ isPaused=false; elapsedSeconds=elapsed; _progressRefElapsed=elapsed; _progressRefTime=Date.now(); setPauseIcon(false); if(activePlatform==='youtube') resumeOnYouTube(); else if(spotifyToken&&nowPlaying) fetch('https://api.spotify.com/v1/me/player/play',{method:'PUT',headers:{Authorization:`Bearer ${spotifyToken}`}}).catch(()=>{}); });
 socket.on('permissions:update',({openControls:oc})=>{ openControls=oc; applyHostUI(); });
 socket.on('room:notify',({msg})=>{ showRoomNotify(msg); });
 socket.on('join:rejected',({reason})=>{
@@ -1454,7 +1468,7 @@ function renderLyrics() {
   const scroll=document.getElementById('lyrics-scroll');
   if(!lyricsLines.length){ scroll.innerHTML='<div class="lyrics-none">No lyrics found</div>'; return; }
   scroll.innerHTML=lyricsLines.map((l,i)=>`<div class="lyric-line" id="lyric-${i}" data-time="${l.time}" onclick="seekToLyric(${l.time})">${l.text}</div>`).join('');
-  updateLyricsHighlight(elapsedSeconds);
+  updateLyricsHighlight(_getLyricsElapsed());
 }
 function renderPlainLyrics(plain) {
   document.getElementById('lyrics-scroll').innerHTML=plain.split('\n').map(l=>l.trim()?`<div class="lyric-line">${l}</div>`:'<div style="height:8px;"></div>').join('');
@@ -1462,11 +1476,14 @@ function renderPlainLyrics(plain) {
 let _lyricsScrollLocked = false, _lyricsLockTimer = null;
 function seekToLyric(t) {
   if(t == null) return;
-  if(activePlatform==='youtube') seekOnYouTube(t);
-  else if(spotifyToken && nowPlaying) {
+  if(activePlatform==='youtube') {
+    seekOnYouTube(t);
+    elapsedSeconds=Math.floor(t); _progressRefElapsed=t; _progressRefTime=Date.now();
+  } else if(spotifyToken && nowPlaying) {
     fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${Math.round(t*1000)}`,{
       method:'PUT',headers:{Authorization:`Bearer ${spotifyToken}`}}).catch(()=>{});
-    elapsedSeconds=t;
+    elapsedSeconds=Math.floor(t);
+    _progressRefElapsed=t; _progressRefTime=Date.now();
   }
   updateLyricsHighlight(t);
 }
@@ -1478,7 +1495,6 @@ async function showArtistTracks() {
   const artistEl = document.getElementById('np-artist');
   const artistName = artistEl ? artistEl.textContent.trim() : '';
   if(!artistName || artistName === '—') return;
-  // Build popup shell
   const ov = document.createElement('div');
   ov.className = 'artist-popup';
   ov.id = 'artist-popup';
@@ -1486,40 +1502,56 @@ async function showArtistTracks() {
   ov.innerHTML = '<div class="artist-popup-card"><button class="artist-popup-close" onclick="document.getElementById(\'artist-popup\').remove()">×</button><div class="artist-popup-title">'+escHtml(artistName)+'</div><div id="artist-tracks-body"><div style="color:var(--text-dim);font-size:13px;">Loading…</div></div></div>';
   document.body.appendChild(ov);
   const body = document.getElementById('artist-tracks-body');
-  if(!spotifyToken) {
-    body.innerHTML = '<div style="color:var(--text-dim);font-size:13px;">Connect Spotify to see top tracks.</div>';
-    return;
-  }
   try {
-    // Search for artist
-    const sr = await fetch('https://api.spotify.com/v1/search?q='+encodeURIComponent(artistName)+'&type=artist&limit=1',{headers:{Authorization:'Bearer '+spotifyToken}});
-    const sd = await sr.json();
-    const artist = sd.artists && sd.artists.items[0];
-    if(!artist) { body.innerHTML = '<div style="color:var(--text-dim);font-size:13px;">No results found.</div>'; return; }
-    const tr = await fetch('https://api.spotify.com/v1/artists/'+artist.id+'/top-tracks?market=from_token',{headers:{Authorization:'Bearer '+spotifyToken}});
-    const td = await tr.json();
-    const tracks = td.tracks || [];
-    if(!tracks.length) { body.innerHTML = '<div style="color:var(--text-dim);font-size:13px;">No top tracks found.</div>'; return; }
-    window._artistTrackData = tracks.map(t => ({
-      uri: t.uri, name: t.name,
-      artist: t.artists.map(a=>a.name).join(', '),
-      img: (t.album?.images?.[1]||t.album?.images?.[0])?.url||'',
-      dur: Math.round(t.duration_ms/1000)
-    }));
-    body.innerHTML = tracks.map((t,i) => {
-      const img2 = t.album?.images?.[2]?.url;
-      return '<div class="artist-track-row"><span class="artist-track-num">'+(i+1)+'</span>'+(img2?'<img class="artist-track-art" src="'+escHtml(img2)+'">':'<div class="artist-track-art"></div>')+'<div class="artist-track-info"><div class="artist-track-name">'+escHtml(t.name)+'</div><div class="artist-track-duration">'+_fmtDuration(t.duration_ms)+'</div></div><button class="artist-track-add" onclick="window._addArtistTrack(event,'+i+')">+Queue</button></div>';
-    }).join('');
+    if(spotifyToken) {
+      // Spotify path
+      const sr = await fetch('https://api.spotify.com/v1/search?q='+encodeURIComponent(artistName)+'&type=artist&limit=1',{headers:{Authorization:'Bearer '+spotifyToken}});
+      const sd = await sr.json();
+      const artist = sd.artists && sd.artists.items[0];
+      if(!artist) { body.innerHTML = '<div style="color:var(--text-dim);font-size:13px;">No results found.</div>'; return; }
+      const tr = await fetch('https://api.spotify.com/v1/artists/'+artist.id+'/top-tracks?market=from_token',{headers:{Authorization:'Bearer '+spotifyToken}});
+      const td = await tr.json();
+      const tracks = (td.tracks || []).slice(0,10);
+      if(!tracks.length) { body.innerHTML = '<div style="color:var(--text-dim);font-size:13px;">No top tracks found.</div>'; return; }
+      window._artistTrackData = tracks.map(t => ({
+        id: t.uri, uri: t.uri, name: t.name,
+        artist: t.artists.map(a=>a.name).join(', '),
+        img: (t.album?.images?.[1]||t.album?.images?.[0])?.url||'',
+        dur: Math.round(t.duration_ms/1000),
+        platform: 'spotify'
+      }));
+      body.innerHTML = tracks.map((t,i) => {
+        const img2 = t.album?.images?.[2]?.url || t.album?.images?.[0]?.url;
+        return '<div class="artist-track-row" onclick="window._playArtistTrack('+i+')" style="cursor:pointer;"><span class="artist-track-num">'+(i+1)+'</span>'+(img2?'<img class="artist-track-art" src="'+escHtml(img2)+'">':'<div class="artist-track-art"></div>')+'<div class="artist-track-info"><div class="artist-track-name">'+escHtml(t.name)+'</div><div class="artist-track-duration">'+_fmtDuration(t.duration_ms)+'</div></div></div>';
+      }).join('');
+    } else if(ytConnected) {
+      // YouTube fallback
+      const r = await fetch(`/youtube/search?query=${encodeURIComponent(artistName+' top songs')}`);
+      const data = await r.json();
+      const tracks = (data.tracks || []).slice(0,10);
+      if(!tracks.length) { body.innerHTML = '<div style="color:var(--text-dim);font-size:13px;">No results found.</div>'; return; }
+      window._artistTrackData = tracks.map(t => ({
+        id: t.id, uri: t.id, name: t.name, artist: t.artist,
+        img: t.image || '', dur: t.duration || 0, platform: 'youtube'
+      }));
+      body.innerHTML = tracks.map((t,i) => {
+        return '<div class="artist-track-row" onclick="window._playArtistTrack('+i+')" style="cursor:pointer;"><span class="artist-track-num">'+(i+1)+'</span>'+(t.image?'<img class="artist-track-art" src="'+escHtml(t.image)+'">':'<div class="artist-track-art"></div>')+'<div class="artist-track-info"><div class="artist-track-name">'+escHtml(t.name)+'</div></div></div>';
+      }).join('');
+    } else {
+      body.innerHTML = '<div style="color:var(--text-dim);font-size:13px;">Connect a music platform to see top tracks.</div>';
+    }
   } catch(err) {
     body.innerHTML = '<div style="color:var(--text-dim);font-size:13px;">Failed to load tracks.</div>';
   }
 }
-window._addArtistTrack = function(e, idx) {
-  e.stopPropagation();
+window._playArtistTrack = function(idx) {
   const d = (window._artistTrackData||[])[idx]; if(!d) return;
-  queue.push({track_name:d.name,artist_name:d.artist,image_url:d.img,spotify_uri:d.uri,duration:d.dur});
-  renderQueue(); broadcastQueueSync();
-  showToast(d.name+' added to queue');
+  const ov = document.getElementById('artist-popup');
+  if(ov) ov.remove();
+  if(nowPlaying) history.push({...nowPlaying});
+  setNowPlaying(d.name, d.artist, d.img, d.dur||240, d.uri, 0);
+  playTrack(d.uri, 0);
+  showToast('Playing '+d.name);
 };
 // Pause auto-scroll when user manually scrolls lyrics
 (function(){
@@ -1587,6 +1619,7 @@ function toggleLyrics() {
   if(_cooldown('lyrics',400)) return;
   lyricsOpen=!lyricsOpen;
   const lyricsCol=document.getElementById('lyrics-col');
+  const lyricsHandle=document.getElementById('lyrics-resize-handle');
   // Mobile: mutual exclusion — close chat when opening lyrics
   if(lyricsOpen && window.innerWidth <= 700 && chatOpen) {
     chatOpen=false;
@@ -1594,7 +1627,7 @@ function toggleLyrics() {
     document.getElementById('chat-toggle-btn').classList.remove('active');
   }
   lyricsCol.classList.toggle('open',lyricsOpen);
-  if(window.innerWidth > 700) lyricsCol.style.right = (chatOpen ? 280 : 0) + 'px';
+  if(lyricsHandle && window.innerWidth > 700) lyricsHandle.classList.toggle('visible',lyricsOpen);
   document.getElementById('lyrics-toggle').classList.toggle('active',lyricsOpen);
   if(lyricsOpen&&nowPlaying) fetchLyrics(nowPlaying.name,nowPlaying.artist);
 }
@@ -1665,21 +1698,26 @@ function joinRoom() {
 
 function fetchRoomState() {
   fetch(`/api/room/${ROOM_ID}/state`).then(r=>r.json()).then(state=>{
+    // Sync room settings regardless of playing state
+    if(state.slow_mode !== undefined) roomSlowMode = state.slow_mode;
+    if(state.blacklist && state.blacklist.length) {
+      roomWordBlacklist = state.blacklist;
+      renderBlacklistTags();
+    }
     if(!state.playing){ queue=[]; renderQueue(); return; }
     const indicator=document.getElementById('sync-indicator');
     indicator.classList.add('visible'); setTimeout(()=>indicator.classList.remove('visible'),3000);
-    nowPlaying={name:state.track_name,artist:state.artist_name,image:state.image_url,duration:state.duration,uri:state.spotify_uri};
+    nowPlaying={name:state.track_name,artist:state.artist_name,image:state.image_url,duration:state.duration,uri:state.youtube_id||state.spotify_uri};
     document.getElementById('np-title').textContent=state.track_name;
     document.getElementById('np-artist').textContent=state.artist_name;
     document.title=state.track_name+' — Wavelength';
     updateAlbumArt(state.image_url); updateBackground(state.image_url);
     queue=state.live_queue||[]; renderQueue();
-    // Fix bug: respect paused state from server
     startProgress(state.duration, state.elapsed, state.is_paused);
     const joinId=state.youtube_id||state.spotify_uri;
     if(joinId){
       const _sameTrack = nowPlaying && nowPlaying.uri === joinId;
-      const _inSync = _sameTrack && Math.abs(state.elapsed - elapsedSeconds) < 10;
+      const _inSync = _sameTrack && Math.abs(state.elapsed - elapsedSeconds) < 2;
       if(!_inSync) playTrack(joinId, state.elapsed*1000);
     } else { window._pendingSync=state; }
     fetchLyrics(state.track_name,state.artist_name);
@@ -1789,6 +1827,7 @@ function startYouTubeSync() {
       }
       if(Math.abs(realPos-elapsedSeconds)>2){
         elapsedSeconds=Math.floor(realPos);
+        _progressRefElapsed=realPos; _progressRefTime=Date.now();
         updateDiamonds((elapsedSeconds/totalSeconds)*100);
         document.getElementById('time-current').textContent=fmt(elapsedSeconds);
       }
@@ -1847,7 +1886,7 @@ function startSpotifySync() {
         const realDur=Math.round(data.item.duration_ms/1000);
         const realPos=Math.round(data.progress_ms/1000);
         if(realDur!==totalSeconds){ totalSeconds=realDur; document.getElementById('time-total').textContent=fmt(totalSeconds); }
-        if(Math.abs(realPos-elapsedSeconds)>2){ elapsedSeconds=realPos; updateDiamonds((elapsedSeconds/totalSeconds)*100); document.getElementById('time-current').textContent=fmt(elapsedSeconds); if(lyricsOpen&&lyricsLines.length)updateLyricsHighlight(elapsedSeconds); }
+        if(Math.abs(realPos-elapsedSeconds)>2){ elapsedSeconds=realPos; _progressRefElapsed=realPos; _progressRefTime=Date.now(); updateDiamonds((elapsedSeconds/totalSeconds)*100); document.getElementById('time-current').textContent=fmt(elapsedSeconds); }
         if(data.is_playing&&isPaused){ isPaused=false; setPauseIcon(false); }
         if(!data.is_playing&&!isPaused){ isPaused=true; setPauseIcon(true); }
       }).catch(()=>{});
@@ -2063,11 +2102,12 @@ function switchMobileTab(tab) {
   lp.classList.remove('mobile-open');
   lc.classList.remove('open');
   cc.classList.remove('open');
+  lyricsOpen=false; chatOpen=false;
   document.querySelectorAll('.mob-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   if(tab==='queue') lp.classList.add('mobile-open');
-  else if(tab==='lyrics'){ lc.classList.add('open'); if(nowPlaying&&!lyricsLines.length)fetchLyrics(nowPlaying.name,nowPlaying.artist); }
-  else if(tab==='chat'){ cc.classList.add('open'); unreadCount=0; updateUnread(); scrollChat(); }
+  else if(tab==='lyrics'){ lyricsOpen=true; lc.classList.add('open'); if(nowPlaying&&!lyricsLines.length)fetchLyrics(nowPlaying.name,nowPlaying.artist); }
+  else if(tab==='chat'){ chatOpen=true; cc.classList.add('open'); unreadCount=0; updateUnread(); scrollChat(); }
 }
 document.addEventListener('click',e=>{ if(!e.target.closest('.search-wrap'))document.getElementById('search-results').style.display='none'; if(!e.target.closest('#members-dropdown') && !e.target.closest('#member-count-btn') && !e.target.closest('.members-pills')){ membersOpen=false; document.getElementById('members-dropdown').classList.remove('open'); } });
 
@@ -2105,11 +2145,22 @@ function settingsToggleBg() {
   bgEnabled = !bgEnabled;
   document.documentElement.classList.toggle('bg-enabled', bgEnabled);
   setToggleState('settings-bg-toggle', bgEnabled);
-  if(bgEnabled && !bgBlur) { bgBlur=true; document.documentElement.classList.add('bg-blur'); setToggleState('settings-bg-blur-toggle',true); localStorage.setItem('wl-bg-blur','1'); }
-  else { setToggleState('settings-bg-blur-toggle', bgBlur); }
-  localStorage.setItem('wl-bg', bgEnabled ? '1' : '0');
-  if(bgEnabled) { showToast('Background on — may affect performance on slower devices'); if(customBgUrl) applyCustomBg(); else if(nowPlaying) updateBackground(nowPlaying.image); }
-  else { const a=document.getElementById('bg-a'), b=document.getElementById('bg-b'); if(a)a.classList.remove('active'); if(b)b.classList.remove('active'); }
+  if(bgEnabled) {
+    // Always enable blur when background is turned on
+    bgBlur = true;
+    document.documentElement.classList.add('bg-blur');
+    setToggleState('settings-bg-blur-toggle', true);
+    localStorage.setItem('wl-bg-blur', '1');
+    localStorage.setItem('wl-bg', '1');
+    showToast('Background on — may affect performance on slower devices');
+    if(customBgUrl) applyCustomBg(); else if(nowPlaying) updateBackground(nowPlaying.image);
+  } else {
+    localStorage.setItem('wl-bg', '0');
+    const a=document.getElementById('bg-a'), b=document.getElementById('bg-b');
+    if(a) a.classList.remove('active');
+    if(b) b.classList.remove('active');
+    setToggleState('settings-bg-blur-toggle', bgBlur);
+  }
 }
 let bgBlur = false;
 (function(){ if(localStorage.getItem('wl-bg-blur')==='1'){ bgBlur=true; document.documentElement.classList.add('bg-blur'); } })();
@@ -2193,7 +2244,18 @@ function confirmBgCrop(){
   ctx.drawImage(img,srcX,srcY,srcW,srcH,0,0,1280,720);
   customBgUrl=canvas.toDataURL('image/jpeg',0.85);
   document.getElementById('bg-crop-modal').style.display='none';
-  if(!bgEnabled) settingsToggleBg(); else applyCustomBg();
+  if(!bgEnabled) {
+    settingsToggleBg(); // this also enables blur
+  } else {
+    // Ensure blur is on whenever a background is applied
+    if(!bgBlur) {
+      bgBlur=true;
+      document.documentElement.classList.add('bg-blur');
+      setToggleState('settings-bg-blur-toggle',true);
+      localStorage.setItem('wl-bg-blur','1');
+    }
+    applyCustomBg();
+  }
 }
 function applyCustomBg() {
   if(!customBgUrl) return;
@@ -2202,7 +2264,7 @@ function applyCustomBg() {
   const broadcastBtn=document.getElementById('bg-broadcast-btn');
   if(preview){preview.style.backgroundImage='url('+customBgUrl+')';preview.style.display='block';}
   if(clearBtn) clearBtn.style.display='';
-  if(broadcastBtn) broadcastBtn.style.display=(isHost||isCoHost)?'':'none';
+  if(broadcastBtn) broadcastBtn.style.display=''; // visible to any uploader
   const a=document.getElementById('bg-a'), b=document.getElementById('bg-b');
   if(!a||!b) return;
   a.style.backgroundImage='url('+customBgUrl+')';
@@ -2224,7 +2286,7 @@ function clearCustomBg() {
 }
 
 function broadcastBg() {
-  if(!customBgUrl || (!isHost && !isCoHost)) return;
+  if(!customBgUrl) return;
   socket.emit('bg:broadcast', { roomId: ROOM_ID, dataUrl: customBgUrl });
   showToast('Background shared with room');
 }
@@ -2294,7 +2356,16 @@ function toggleTheme() {
 // Apply saved theme on load
 (function(){
   const saved = localStorage.getItem('wl-theme');
-  if(saved === 'light') { isDark = false; document.documentElement.classList.add('light'); const icon = document.getElementById('theme-icon'); if(icon) icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'; }
+  if(saved === 'light') {
+    isDark = false;
+    document.documentElement.classList.add('light');
+    const icon = document.getElementById('theme-icon');
+    if(icon) icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  } else {
+    isDark = true;
+    document.documentElement.classList.remove('light');
+    if(!saved) localStorage.setItem('wl-theme', 'dark');
+  }
 })();
 
 // ── CHAT PANEL ────────────────────────────────────────────
@@ -2313,16 +2384,13 @@ function toggleChat() {
   document.getElementById('chat-toggle-btn').classList.toggle('active', chatOpen);
   if(!chatOpen && chatPopped) { chatPopped=false; col.classList.remove('popped'); col.style.left=''; col.style.top=''; col.style.bottom=''; col.style.right=''; }
   if(chatOpen){ unreadCount=0; updateUnread(); scrollChat(); }
-  if(lyricsOpen) {
-    const lyricsCol=document.getElementById('lyrics-col');
-    if(window.innerWidth > 700) lyricsCol.style.right = (chatOpen ? 280 : 0) + 'px';
-  }
 }
 
 let chatPoppedX=null, chatPoppedY=null;
 function toggleChatPopout() {
   const col = document.getElementById('chat-col');
   const icon = document.getElementById('chat-popout-icon');
+  const btn = document.getElementById('chat-popout-btn');
   chatPopped = !chatPopped;
   if(chatPopped) {
     col.classList.add('popped');
@@ -2333,7 +2401,6 @@ function toggleChatPopout() {
     const dh = document.getElementById('chat-drag-handle');
     if(dh) dh.style.cursor='grab';
     btn.title = 'Dock back';
-    if(lyricsOpen && window.innerWidth > 700) document.getElementById('lyrics-col').style.right = '0px';
     // Compress arrows icon (dock back)
     icon.innerHTML = '<polyline points="4,14 10,14 10,20"/><polyline points="20,10 14,10 14,4"/><line x1="10" y1="14" x2="21" y2="3"/><line x1="3" y1="21" x2="14" y2="10"/>';
   } else {
@@ -2342,7 +2409,6 @@ function toggleChatPopout() {
     const dh2=document.getElementById('chat-drag-handle');
     if(dh2) dh2.style.cursor='default';
     btn.title = 'Float';
-    if(lyricsOpen && window.innerWidth > 700) document.getElementById('lyrics-col').style.right = (chatOpen ? 280 : 0) + 'px';
     icon.innerHTML = '<polyline points="15,3 21,3 21,9"/><polyline points="9,21 3,21 3,15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>';
   }
 }
@@ -2762,6 +2828,7 @@ seekTrack.addEventListener('click', e => {
   const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
   const seekSec = Math.floor(pct * totalSeconds);
   elapsedSeconds = seekSec;
+  _progressRefElapsed=seekSec; _progressRefTime=Date.now();
   updateDiamonds(pct * 100);
   document.getElementById('time-current').textContent = fmt(seekSec);
   if(activePlatform==='youtube') seekOnYouTube(seekSec); else if(spotifyToken) playOnSpotify(nowPlaying.uri, seekSec*1000);
