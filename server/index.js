@@ -143,6 +143,49 @@ app.post('/spotify/play', async (req, res) => {
   }
 });
 
+// ── Trending ──────────────────────────────────────────────
+let _trendingCache = null;
+let _trendingCachedAt = 0;
+
+async function _spotifyClientToken() {
+  const r = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/x-www-form-urlencoded',
+      'Authorization': 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64')
+    },
+    body: new URLSearchParams({ grant_type: 'client_credentials' })
+  });
+  const d = await r.json();
+  return d.access_token;
+}
+
+app.get('/api/trending', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (_trendingCache && (now - _trendingCachedAt < 24 * 60 * 60 * 1000)) {
+      return res.json(_trendingCache);
+    }
+    const token = await _spotifyClientToken();
+    const r = await fetch(
+      'https://api.spotify.com/v1/playlists/37i9dQZEVXbLRQDuF5jeBp/tracks?limit=5&market=US',
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const data = await r.json();
+    const tracks = (data.items || []).slice(0, 5).map(item => ({
+      name:   item.track.name,
+      artist: item.track.artists[0].name,
+      image:  item.track.album.images[0]?.url || ''
+    }));
+    _trendingCache = tracks;
+    _trendingCachedAt = now;
+    res.json(tracks);
+  } catch(e) {
+    console.error('Trending error:', e.message);
+    res.json(_trendingCache || []);
+  }
+});
+
 // ── Room API ──────────────────────────────────────────────
 app.post('/room', async (req, res) => {
   const { name, is_private, passcode } = req.body;

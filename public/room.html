@@ -226,7 +226,7 @@ html.bg-blur .bg-canvas { filter:blur(60px) saturate(1.4); transform:scale(1.15)
 .album-wrap { position:relative; flex-shrink:0; width:min(440px,48vh); }
 .album-sizer { width:100%; aspect-ratio:1; display:block; }
 .album-wrap.empty .album-sizer { display:none; }
-.album-art-a, .album-art-b { position:absolute; inset:0; width:100%; height:100%; border-radius:16px; object-fit:cover; box-shadow:0 0 36px var(--album-glow), 0 24px 64px var(--album-shadow); transition:opacity 0.7s ease; }
+.album-art-a, .album-art-b { position:absolute; inset:0; width:100%; height:100%; border-radius:16px; object-fit:contain; background:rgba(255,255,255,0.03); box-shadow:0 0 36px var(--album-glow), 0 24px 64px var(--album-shadow); transition:opacity 0.7s ease; }
 .album-art-a { opacity:0; z-index:1; }
 .album-art-b { opacity:0; z-index:0; }
 .album-placeholder { position:absolute; inset:0; border-radius:16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; }
@@ -562,6 +562,81 @@ html.light .chat-col.popped { background:rgba(248,249,252,0.88) !important; }
 .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(8px); background:var(--bg-card); border:1px solid rgba(29,185,84,0.25); color:var(--text-dim); font-size:12px; font-weight:500; padding:9px 18px; border-radius:20px; opacity:0; transition:opacity 0.25s,transform 0.25s; pointer-events:none; z-index:500; white-space:nowrap; display:flex; align-items:center; gap:7px; }
 .toast::before { content:''; width:5px; height:5px; border-radius:50%; background:#1db954; flex-shrink:0; }
 .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* ── QUEUE CARD SPREAD ── */
+.queue-card-spread {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 20px 8px 12px;
+  position: relative;
+  flex-shrink: 0;
+  min-height: 136px;
+  perspective: 600px;
+}
+.q-card {
+  flex-shrink: 0;
+  width: 72px;
+  height: 96px;
+  border-radius: 24px;
+  position: relative;
+  cursor: pointer;
+  margin: 0 -16px;
+  overflow: hidden;
+  transition: transform 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s ease, box-shadow 0.3s;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.3);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+}
+.q-card:hover { box-shadow: 0 14px 36px rgba(0,0,0,0.7), 0 4px 12px rgba(0,0,0,0.4); }
+.q-card:hover .q-card-del { display: flex; }
+.q-card-art {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+}
+.q-card-bg {
+  position: absolute; inset: 0; border-radius: 24px;
+}
+.q-card-info {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, transparent 100%);
+  padding: 20px 6px 5px;
+  border-radius: 0 0 24px 24px;
+  z-index: 2;
+}
+.q-card-track {
+  font-size: 7px; font-weight: 700;
+  color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: 'Syne', sans-serif;
+  letter-spacing: 0.03em;
+}
+.q-card-num {
+  font-size: 6px;
+  color: rgba(255,255,255,0.5);
+  font-family: 'Syne', sans-serif;
+  margin-top: 1px;
+}
+.q-card-del {
+  position: absolute; top: 5px; right: 5px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: rgba(0,0,0,0.65); border: none; color: rgba(255,255,255,0.8);
+  font-size: 11px; cursor: pointer; display: none;
+  align-items: center; justify-content: center;
+  line-height: 1; padding: 0; z-index: 3;
+  transition: background 0.15s;
+}
+.q-card-del:hover { background: rgba(220,60,60,0.8); }
+.queue-more-label {
+  text-align: center; font-size: 10px; color: var(--text-dimmer);
+  padding: 4px 16px 8px; flex-shrink: 0;
+  font-family: 'Syne', sans-serif; letter-spacing: 0.12em; text-transform: uppercase;
+}
 </style>
 <script src="https://www.youtube.com/iframe_api"></script>
 </head>
@@ -1013,6 +1088,25 @@ function updateBackground(url) {
 }
 
 // ── ALBUM ART ────────────────────────────────────────────
+function _ytFallbackChain(img, videoId) {
+  const qualities = ['hqdefault', 'mqdefault', 'default'];
+  let qi = 0;
+  img.onerror = function() {
+    if (qi < qualities.length) {
+      img.src = `https://i.ytimg.com/vi/${videoId}/${qualities[qi++]}.jpg`;
+    } else {
+      img.onerror = null;
+      img.src = '';
+    }
+  };
+}
+function _applyArtSrc(img, url) {
+  if (!url) return;
+  const m = url.match(/i\.ytimg\.com\/vi\/([^/]+)\//);
+  if (m) _ytFallbackChain(img, m[1]);
+  img.src = url;
+}
+
 function updateAlbumArt(url) {
   const wrap=document.getElementById('album-wrap');
   const imgA=document.getElementById('album-a'), imgB=document.getElementById('album-b');
@@ -1022,10 +1116,12 @@ function updateAlbumArt(url) {
   }
   wrap.classList.remove('empty'); wrap.classList.add('playing');
   if(albumActive==='a'){
-    imgB.src=url; imgB.onload=()=>{ imgB.style.zIndex='2'; imgB.style.opacity='1'; imgA.style.opacity='0'; setTimeout(()=>{ imgA.style.zIndex='0'; imgB.style.zIndex='1'; },750); };
+    _applyArtSrc(imgB, url);
+    imgB.onload=()=>{ imgB.style.zIndex='2'; imgB.style.opacity='1'; imgA.style.opacity='0'; setTimeout(()=>{ imgA.style.zIndex='0'; imgB.style.zIndex='1'; },750); };
     albumActive='b';
   } else {
-    imgA.src=url; imgA.onload=()=>{ imgA.style.zIndex='2'; imgA.style.opacity='1'; imgB.style.opacity='0'; setTimeout(()=>{ imgB.style.zIndex='0'; imgA.style.zIndex='1'; },750); };
+    _applyArtSrc(imgA, url);
+    imgA.onload=()=>{ imgA.style.zIndex='2'; imgA.style.opacity='1'; imgB.style.opacity='0'; setTimeout(()=>{ imgB.style.zIndex='0'; imgA.style.zIndex='1'; },750); };
     albumActive='a';
   }
 }
@@ -1380,31 +1476,71 @@ socket.on('member:update',roomMembers=>{
 });
 
 // ── QUEUE RENDER ─────────────────────────────────────────
+const _cardBgColors = [
+  ['#0d1f14','#1db954'],['#1a0d2e','#9b59b6'],['#0d1a26','#3498db'],
+  ['#261a0d','#e67e22'],['#1a0d0d','#e74c3c'],['#0d1a14','#2ecc71'],['#1a1a0d','#f1c40f']
+];
+function _qCardBg(s, i) { return _cardBgColors[(s ? s.charCodeAt(0) : i) % _cardBgColors.length]; }
+
+function _qCardArtSrc(img, url) {
+  if (!url) return;
+  const m = url.match(/i\.ytimg\.com\/vi\/([^/]+)\//);
+  if (m) {
+    const vId = m[1], quals = ['hqdefault','mqdefault','default']; let qi = 0;
+    img.onerror = () => { img.src = qi < quals.length ? `https://i.ytimg.com/vi/${vId}/${quals[qi++]}.jpg` : ''; };
+  }
+  img.src = url;
+}
+
 function renderQueue() {
-  const list=document.getElementById('queue-list');
-  if(!queue.length){
-    list.innerHTML='<div class="queue-empty"><div class="queue-empty-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.5"/><circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="1.5"/></svg></div>Search for a song to get started</div>';
+  const list = document.getElementById('queue-list');
+  if (!queue.length) {
+    list.innerHTML = '<div class="queue-empty"><div class="queue-empty-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.5"/><circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="1.5"/></svg></div>Search for a song to get started</div>';
+    for (const i of _queueSelection) _queueSelection.delete(i);
+    _updateQueueBulkBar();
     return;
   }
-  list.innerHTML=queue.map((item,i)=>`
-    <div class="q-item${_queueSelection.has(i)?' q-selected':''}" draggable="true" data-idx="${i}" onclick="window.queueItemClick(${i},event)">
-      <div class="q-num">${i+1}</div>
-      ${item.image_url?`<img class="q-art" src="${item.image_url}">`:'<div class="q-art"></div>'}
-      <div style="flex:1;min-width:0;">
-        <div class="q-track">${item.track_name}</div>
-        <div class="q-artist">${item.artist_name}</div>
+
+  const MAX_CARDS = 7;
+  const visible = queue.slice(0, MAX_CARDS);
+  const center = Math.floor((visible.length - 1) / 2);
+
+  const cardHtml = visible.map((item, i) => {
+    const offset = i - center;
+    const tilt = -(offset) * 9;
+    const scale = 1 - Math.abs(offset) * 0.07;
+    const opacity = i === center ? 1 : 0.72 - Math.abs(offset) * 0.06;
+    const zIndex = MAX_CARDS - Math.abs(offset);
+    const translateY = Math.abs(offset) * 7;
+    const [bg1, bg2] = _qCardBg(item.track_name, i);
+    const artId = `qca-${i}`;
+    return `<div class="q-card" data-idx="${i}"
+        style="transform:translateY(${translateY}px) rotate(${tilt}deg) scale(${scale});z-index:${zIndex};opacity:${opacity};"
+        onclick="window.queueItemClick(${i},event)"
+        title="${escHtml(item.track_name)} — ${escHtml(item.artist_name)}">
+      <div class="q-card-bg" style="background:linear-gradient(160deg,${bg1},${bg2 + '55'});"></div>
+      ${item.image_url ? `<img id="${artId}" class="q-card-art" src="" alt="">` : ''}
+      <div class="q-card-info">
+        <div class="q-card-track">${escHtml(item.track_name)}</div>
+        <div class="q-card-num">#${i + 1}</div>
       </div>
-      <button class="q-del" onclick="window.deleteQueueItem(${i},event)">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><polyline points="3,6 5,6 21,6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9 6V4h6v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-    </div>`).join('');
-  list.querySelectorAll('.q-item').forEach(el=>{
-    el.addEventListener('dragstart',e=>{ dragSrcIdx=+el.dataset.idx; e.dataTransfer.effectAllowed='move'; });
-    el.addEventListener('dragend',()=>list.querySelectorAll('.q-item').forEach(i=>i.classList.remove('drag-over')));
-    el.addEventListener('dragover',e=>{ e.preventDefault(); list.querySelectorAll('.q-item').forEach(i=>i.classList.remove('drag-over')); el.classList.add('drag-over'); });
-    el.addEventListener('drop',e=>{ e.preventDefault(); const dest=+el.dataset.idx; if(dragSrcIdx===null||dragSrcIdx===dest)return; const moved=queue.splice(dragSrcIdx,1)[0]; queue.splice(dest,0,moved); renderQueue(); broadcastQueueSync(); dragSrcIdx=null; });
+      <button class="q-card-del" onclick="window.deleteQueueItem(${i},event)">×</button>
+    </div>`;
+  }).join('');
+
+  const moreLabel = queue.length > MAX_CARDS
+    ? `<div class="queue-more-label">+${queue.length - MAX_CARDS} more in queue</div>` : '';
+
+  list.innerHTML = `<div class="queue-card-spread">${cardHtml}</div>${moreLabel}`;
+
+  // Load images after DOM is built to allow onerror wiring
+  visible.forEach((item, i) => {
+    if (!item.image_url) return;
+    const img = document.getElementById(`qca-${i}`);
+    if (img) _qCardArtSrc(img, item.image_url);
   });
-  for(const i of _queueSelection) { if(i >= queue.length) _queueSelection.delete(i); }
+
+  for (const i of _queueSelection) { if (i >= queue.length) _queueSelection.delete(i); }
   _updateQueueBulkBar();
 }
 

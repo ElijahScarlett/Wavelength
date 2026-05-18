@@ -335,6 +335,42 @@
     }
     .preview-line-fill { animation: progressAnim 6s ease-in-out infinite alternate; }
 
+    /* ── TRENDING BACKGROUND ── */
+    #trending-bg {
+      position: fixed; inset: 0; z-index: 0;
+      pointer-events: none; overflow: hidden;
+    }
+    #trending-overlay {
+      position: fixed; inset: 0; z-index: 0;
+      background: radial-gradient(ellipse at 50% 50%, transparent 20%, rgba(8,10,16,0.72) 70%);
+      pointer-events: none;
+    }
+    .trend-card {
+      position: absolute;
+      width: 170px; height: 226px;
+      border-radius: 28px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.4);
+      opacity: 0;
+      transition: opacity 1.4s ease;
+    }
+    .trend-card.visible { opacity: 0.48; }
+    .trend-card img {
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
+    }
+    .trend-card::after {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: 28px;
+      background: radial-gradient(ellipse at center, transparent 30%, rgba(8,10,16,0.55) 100%);
+    }
+    @keyframes tcFloat0 { 0%{transform:translateY(0) rotate(-2.5deg)} 100%{transform:translateY(-26px) rotate(1deg)} }
+    @keyframes tcFloat1 { 0%{transform:translateY(0) rotate(3deg)} 100%{transform:translateY(-19px) rotate(-1.5deg)} }
+    @keyframes tcFloat2 { 0%{transform:translateY(0) rotate(-1deg)} 100%{transform:translateY(-23px) rotate(2.5deg)} }
+    @keyframes tcFloat3 { 0%{transform:translateY(0) rotate(2deg)} 100%{transform:translateY(-16px) rotate(-2deg)} }
+    @keyframes tcFloat4 { 0%{transform:translateY(0) rotate(-3deg)} 100%{transform:translateY(-21px) rotate(1.5deg)} }
+
     /* Platforms note */
     .platforms-note {
       margin-top: 16px;
@@ -349,6 +385,10 @@
   </style>
 </head>
 <body>
+
+  <!-- Trending background -->
+  <div id="trending-bg"></div>
+  <div id="trending-overlay"></div>
 
   <div class="orb orb-1"></div>
   <div class="orb orb-2"></div>
@@ -518,6 +558,53 @@
       err.style.display='none';
       window.location.href = `/room/${roomId}`;
     }
+    // ── TRENDING BACKGROUND ────────────────────────────────
+    (async function initTrendingBg() {
+      const positions = [
+        { top: '4%',  left: '1%',   anim: 'tcFloat0', dur: '7.2s',  delay: '0s'   },
+        { top: '6%',  right: '3%',  anim: 'tcFloat1', dur: '8.8s',  delay: '-2.1s' },
+        { top: '42%', right: '1%',  anim: 'tcFloat2', dur: '9.4s',  delay: '-4.3s' },
+        { bottom: '5%', left: '4%', anim: 'tcFloat3', dur: '7.9s',  delay: '-1.2s' },
+        { bottom: '8%', right: '6%',anim: 'tcFloat4', dur: '8.3s',  delay: '-3.5s' },
+      ];
+      const fallbackColors = ['#1a1a3e','#2a0a2a','#0a1a2a','#2a1a0a','#1a0d0d'];
+
+      try {
+        const res = await fetch('/api/trending');
+        const tracks = await res.json();
+        const bg = document.getElementById('trending-bg');
+        if (!bg || !tracks.length) return;
+
+        tracks.slice(0, 5).forEach((track, i) => {
+          const pos = positions[i];
+          const card = document.createElement('div');
+          card.className = 'trend-card';
+
+          // Position
+          Object.entries(pos).forEach(([k, v]) => {
+            if (['top','bottom','left','right'].includes(k)) card.style[k] = v;
+          });
+          card.style.animation = `${pos.anim} ${pos.dur} ${pos.delay} ease-in-out infinite alternate`;
+
+          if (track.image) {
+            const img = document.createElement('img');
+            img.alt = track.name;
+            img.src = track.image;
+            img.onerror = () => { card.style.background = fallbackColors[i]; };
+            card.appendChild(img);
+          } else {
+            card.style.background = fallbackColors[i];
+          }
+
+          bg.appendChild(card);
+          // Fade in after a short delay so entrance is smooth
+          setTimeout(() => card.classList.add('visible'), 200 + i * 180);
+        });
+      } catch(e) {
+        // Trending unavailable — background stays empty, no error shown
+      }
+    })();
+
     async function createRoom() {
       const input = document.getElementById('room-name');
       const btn   = document.getElementById('create-btn');
