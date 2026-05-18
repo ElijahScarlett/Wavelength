@@ -149,7 +149,7 @@
       background: var(--border);
       border-radius: 10px;
       position: relative;
-      transition: background 0.2s;
+      transition: background 0.25s;
       flex-shrink: 0;
     }
     .toggle-switch.on { background: #1db954; }
@@ -159,9 +159,12 @@
       top: 3px; left: 3px;
       width: 14px; height: 14px;
       border-radius: 50%; background: #fff;
-      transition: left 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+      transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+      transform: translateX(0);
+      will-change: transform;
     }
-    .toggle-switch.on::after { left: 19px; }
+    .toggle-switch.on::after { transform: translateX(16px); }
     .toggle-label { font-size: 13px; color: var(--text-dim); }
 
     .passcode-wrap { margin-bottom: 10px; display: none; }
@@ -396,6 +399,15 @@
 
   <!-- LEFT -->
   <div class="left">
+    <button class="theme-toggle-home" onclick="toggleTheme()" aria-label="Toggle theme">
+      <svg id="theme-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </button>
     <div class="wordmark">Wavelength</div>
 
     <div class="headline">
@@ -516,31 +528,25 @@
       if (e.key === 'Enter') joinRoom();
     });
 
-    let isDark = true;
+    const SUN_ICON  = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+    const MOON_ICON = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+    function _setThemeIcon(dark) {
+      const icon = document.getElementById('theme-icon');
+      if (icon) icon.innerHTML = dark ? SUN_ICON : MOON_ICON;
+    }
+
+    // Default to dark; only go light if explicitly saved
+    let isDark = localStorage.getItem('wl-theme') !== 'light';
+    if (!isDark) document.documentElement.classList.add('light');
+    else { document.documentElement.classList.remove('light'); localStorage.setItem('wl-theme', 'dark'); }
+    _setThemeIcon(isDark);
+
     function toggleTheme() {
       isDark = !isDark;
       document.documentElement.classList.toggle('light', !isDark);
       localStorage.setItem('wl-theme', isDark ? 'dark' : 'light');
-      const icon = document.getElementById('theme-icon');
-      if(isDark) {
-        icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
-      } else {
-        icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
-      }
+      _setThemeIcon(isDark);
     }
-    (function(){
-      const saved = localStorage.getItem('wl-theme');
-      if(saved === 'light') {
-        isDark = false;
-        document.documentElement.classList.add('light');
-        const icon = document.getElementById('theme-icon');
-        if(icon) icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
-      } else {
-        isDark = true;
-        document.documentElement.classList.remove('light');
-        if(!saved) localStorage.setItem('wl-theme', 'dark');
-      }
-    })();
 
     function joinRoom() {
       const raw = document.getElementById('join-input').value.trim();
@@ -561,48 +567,48 @@
     // ── TRENDING BACKGROUND ────────────────────────────────
     (async function initTrendingBg() {
       const positions = [
-        { top: '4%',  left: '1%',   anim: 'tcFloat0', dur: '7.2s',  delay: '0s'   },
-        { top: '6%',  right: '3%',  anim: 'tcFloat1', dur: '8.8s',  delay: '-2.1s' },
-        { top: '42%', right: '1%',  anim: 'tcFloat2', dur: '9.4s',  delay: '-4.3s' },
-        { bottom: '5%', left: '4%', anim: 'tcFloat3', dur: '7.9s',  delay: '-1.2s' },
-        { bottom: '8%', right: '6%',anim: 'tcFloat4', dur: '8.3s',  delay: '-3.5s' },
+        { top: '4%',   left: '1%',   anim: 'tcFloat0', dur: '7.2s', delay: '0s'    },
+        { top: '6%',   right: '3%',  anim: 'tcFloat1', dur: '8.8s', delay: '-2.1s' },
+        { top: '42%',  right: '1%',  anim: 'tcFloat2', dur: '9.4s', delay: '-4.3s' },
+        { bottom: '5%',left: '4%',   anim: 'tcFloat3', dur: '7.9s', delay: '-1.2s' },
+        { bottom: '8%',right: '6%',  anim: 'tcFloat4', dur: '8.3s', delay: '-3.5s' },
       ];
-      const fallbackColors = ['#1a1a3e','#2a0a2a','#0a1a2a','#2a1a0a','#1a0d0d'];
+      const fallbackColors = ['#0d1520','#1a0d28','#0d1a20','#201a0d','#1a0d0d'];
 
+      // Try to load real album art; fall back to solid colors gracefully
+      let tracks = [];
       try {
         const res = await fetch('/api/trending');
-        const tracks = await res.json();
-        const bg = document.getElementById('trending-bg');
-        if (!bg || !tracks.length) return;
+        if (res.ok) tracks = await res.json();
+      } catch(_) { /* network error — use fallback colors */ }
 
-        tracks.slice(0, 5).forEach((track, i) => {
-          const pos = positions[i];
-          const card = document.createElement('div');
-          card.className = 'trend-card';
+      const bg = document.getElementById('trending-bg');
+      if (!bg) return;
 
-          // Position
-          Object.entries(pos).forEach(([k, v]) => {
-            if (['top','bottom','left','right'].includes(k)) card.style[k] = v;
-          });
-          card.style.animation = `${pos.anim} ${pos.dur} ${pos.delay} ease-in-out infinite alternate`;
+      positions.forEach((pos, i) => {
+        const track = tracks[i] || null;
+        const card = document.createElement('div');
+        card.className = 'trend-card';
+        card.style.background = fallbackColors[i];
 
-          if (track.image) {
-            const img = document.createElement('img');
-            img.alt = track.name;
-            img.src = track.image;
-            img.onerror = () => { card.style.background = fallbackColors[i]; };
-            card.appendChild(img);
-          } else {
-            card.style.background = fallbackColors[i];
-          }
+        // Position
+        ['top','bottom','left','right'].forEach(k => { if (pos[k]) card.style[k] = pos[k]; });
+        card.style.animation = `${pos.anim} ${pos.dur} ${pos.delay} ease-in-out infinite alternate`;
 
-          bg.appendChild(card);
-          // Fade in after a short delay so entrance is smooth
-          setTimeout(() => card.classList.add('visible'), 200 + i * 180);
-        });
-      } catch(e) {
-        // Trending unavailable — background stays empty, no error shown
-      }
+        if (track && track.image) {
+          const img = document.createElement('img');
+          img.alt = track.name || '';
+          img.src = track.image;
+          img.onerror = () => { img.style.display = 'none'; };
+          card.appendChild(img);
+        }
+
+        bg.appendChild(card);
+        // Double-rAF ensures opacity:0 is painted before transitioning to visible
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          setTimeout(() => card.classList.add('visible'), i * 160);
+        }));
+      });
     })();
 
     async function createRoom() {
